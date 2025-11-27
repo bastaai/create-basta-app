@@ -1,0 +1,12 @@
+{
+  "name": "create-basta-app",
+  "version": "1.0.0",
+  "bin": {
+    "create-basta-app": "bin/cli.js"
+  },
+  "type": "module",
+  "dependencies": {
+    "prompts": "2.4.2",
+    "commander": "14.0.2"
+  }
+}
