@@ -1,119 +1,20 @@
 import { AuctionNav } from "@/components/auction-nav";
 import { AuctionFooter } from "@/components/auction-footer";
-import { AuctionProgressBar } from "@/components/auction-countdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Clock } from "lucide-react";
 import Link from "next/link";
 
-import { createClientApiClient, type clientApiSchema } from "@bastaai/basta-js";
+import { createClientApiClient } from "@bastaai/basta-js";
 import { DateTime } from "luxon";
-
-type Auction = {
-  id: string;
-  title: string | undefined;
-  location: string | undefined;
-  dates: {
-    openDate: string | undefined;
-    closingDate: string | undefined;
-  };
-  status: clientApiSchema.SaleStatus | undefined;
-  image: string | undefined;
-  lotsCount: number | undefined;
-  label: string | undefined;
-  estimate: string | undefined;
-};
-
-// Mock auction data
-const upcomingAuctions: Auction[] = [
-  {
-    id: "1",
-    title: "Modern & Contemporary Art",
-    location: "New York",
-    dates: {
-      openDate: "2025-03-15T07:00:00",
-      closingDate: new Date(Date.now() + 2 * 60 * 60 * 1000).toString(), // Closes in 2 hours
-    },
-    image: "/modern-contemporary-art-auction.jpg",
-    lotsCount: 124,
-    status: "LIVE" as const,
-    label: "Live Bidding",
-    estimate: "$15M - $22M",
-  },
-  {
-    id: "2",
-    title: "Impressionist & Post-War Art",
-    location: "London",
-    dates: {
-      openDate: "2025-03-22T19:00:00",
-      closingDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toString(), // Close in 5 days
-    },
-    image: "/impressionist-art-auction.jpg",
-    lotsCount: 86,
-    status: "PUBLISHED" as const,
-    label: "Opening Soon",
-    estimate: "$25M - $35M",
-  },
-  // {
-  //   id: "3",
-  //   title: "Asian Art & Ceramics",
-  //   location: "Hong Kong",
-  //   date: "March 28, 2025",
-  //   time: "3:00 PM HKT",
-  //   image: "/asian-art-ceramics-auction.jpg",
-  //   lotsCount: 203,
-  //   status: "live" as const,
-  //   statusLabel: "Accepting Bids",
-  //   estimate: "$8M - $12M",
-  //   closesAt: new Date(Date.now() + 12 * 60 * 60 * 1000), // Closes in 12 hours
-  // },
-  // {
-  //   id: "4",
-  //   title: "Fine Jewelry & Watches",
-  //   location: "Geneva",
-  //   date: "April 5, 2025",
-  //   time: "6:00 PM CET",
-  //   image: "/fine-jewelry-watches-auction.jpg",
-  //   lotsCount: 156,
-  //   status: "upcoming" as const,
-  //   statusLabel: "Preview Available",
-  //   estimate: "$18M - $28M",
-  //   closesAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000), // Opens in 10 days
-  // },
-  // {
-  //   id: "5",
-  //   title: "Old Masters & British Paintings",
-  //   location: "London",
-  //   date: "April 12, 2025",
-  //   time: "2:00 PM GMT",
-  //   image: "/old-masters-paintings-auction.jpg",
-  //   lotsCount: 67,
-  //   status: "upcoming" as const,
-  //   statusLabel: "Catalogue Available",
-  //   estimate: "$32M - $45M",
-  //   closesAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // Opens in 15 days
-  // },
-  // {
-  //   id: "6",
-  //   title: "Design & Decorative Arts",
-  //   location: "Paris",
-  //   date: "April 18, 2025",
-  //   time: "4:00 PM CEST",
-  //   image: "/design-decorative-arts-auction.jpg",
-  //   lotsCount: 142,
-  //   status: "live" as const,
-  //   statusLabel: "Accepting Bids",
-  //   estimate: "$6M - $9M",
-  //   closesAt: new Date(Date.now() + 36 * 60 * 60 * 1000), // Closes in 36 hours
-  // },
-];
+import { Auction, mockAuctions } from "./_mocks/auctions";
 
 async function getUpcomingAuctions() {
   if (!process.env.ACCOUNT_ID || !process.env.API_KEY) {
-    console.error("Missing env variables: ACCOUNT_ID | API_KEY");
+    console.log("Missing env variables: ACCOUNT_ID | API_KEY");
     console.log("returning mock auctions...");
-    return upcomingAuctions;
+    return mockAuctions;
   }
   const client = createClientApiClient({
     headers: {
@@ -171,7 +72,7 @@ async function getUpcomingAuctions() {
   } catch (error) {
     console.error(error);
     console.log("Something went wrong, returning mock data...");
-    return upcomingAuctions;
+    return mockAuctions;
   }
 }
 
@@ -300,10 +201,6 @@ export default async function HomePage() {
                       </div>
                     </div>
                   </CardContent>
-                  {/* <AuctionProgressBar
-                  closesAt={auction.closesAt}
-                  status={auction.status}
-                /> */}
                 </Card>
               </Link>
             );
