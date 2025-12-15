@@ -22,7 +22,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 
-type Lot = {
+export type Lot = {
   lotNumber: number;
   title: string | undefined;
   artist: string | undefined;
@@ -33,8 +33,8 @@ type Lot = {
   provenance: string[];
   exhibited: string[];
   literature: string[];
-  condition: string;
-  currency: string;
+  condition: string | undefined;
+  currency: string | null;
   lowEstimate: number | null;
   highEstimate: number | null;
   currentBid: number | null;
@@ -388,3 +388,14 @@ export default function LotDetailPage({ lotData }: { lotData: Lot }) {
     </div>
   );
 }
+
+const bidHistory = [
+  { id: 1, amount: 48000, bidder: "Bidder #7352", time: "2 minutes ago" },
+  { id: 2, amount: 46000, bidder: "Bidder #2891", time: "15 minutes ago" },
+  { id: 3, amount: 44000, bidder: "Bidder #7352", time: "28 minutes ago" },
+  { id: 4, amount: 42000, bidder: "Bidder #5623", time: "45 minutes ago" },
+  { id: 5, amount: 40000, bidder: "Bidder #2891", time: "1 hour ago" },
+  { id: 6, amount: 38000, bidder: "Bidder #7352", time: "2 hours ago" },
+  { id: 7, amount: 36000, bidder: "Bidder #1024", time: "3 hours ago" },
+  { id: 8, amount: 34000, bidder: "Bidder #5623", time: "5 hours ago" },
+];

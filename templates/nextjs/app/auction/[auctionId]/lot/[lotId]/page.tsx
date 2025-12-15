@@ -1,4 +1,5 @@
-import LDP from "./LDP";
+import { createClientApiClient } from "@bastaai/basta-js";
+import LDP, { Lot } from "./LDP";
 
 // Mock lot data
 const lotData = {
@@ -37,25 +38,82 @@ const lotData = {
   ],
 };
 
-const bidHistory = [
-  { id: 1, amount: 48000, bidder: "Bidder #7352", time: "2 minutes ago" },
-  { id: 2, amount: 46000, bidder: "Bidder #2891", time: "15 minutes ago" },
-  { id: 3, amount: 44000, bidder: "Bidder #7352", time: "28 minutes ago" },
-  { id: 4, amount: 42000, bidder: "Bidder #5623", time: "45 minutes ago" },
-  { id: 5, amount: 40000, bidder: "Bidder #2891", time: "1 hour ago" },
-  { id: 6, amount: 38000, bidder: "Bidder #7352", time: "2 hours ago" },
-  { id: 7, amount: 36000, bidder: "Bidder #1024", time: "3 hours ago" },
-  { id: 8, amount: 34000, bidder: "Bidder #5623", time: "5 hours ago" },
-];
+async function getLotDetails(auctionId: string, lotId: string) {
+  if (["1", "2"].includes(auctionId)) {
+    return lotData;
+  }
 
-async function getLotDetails() {}
+  if (!process.env.ACCOUNT_ID || !process.env.API_KEY) {
+    console.error("Missing env variables: ACCOUNT_ID | API_KEY");
+    return null;
+  }
+
+  const client = createClientApiClient({
+    headers: {
+      "x-account-id": process.env.ACCOUNT_ID,
+      "x-api-key": process.env.API_KEY,
+    },
+  });
+
+  try {
+    const { saleItem } = await client.query({
+      saleItem: {
+        __args: {
+          saleId: auctionId,
+          itemId: lotId,
+        },
+        itemNumber: true,
+        title: true,
+        currency: true,
+        estimates: {
+          low: true,
+          high: true,
+        },
+        currentBid: true,
+        nextAsks: true,
+      },
+    });
+    const lotDetails: Lot = {
+      lotNumber: saleItem.itemNumber,
+      title: saleItem.title ?? undefined,
+      artist: undefined,
+      year: undefined,
+      medium: undefined,
+      dimensions: undefined,
+      signed: undefined,
+      provenance: [],
+      exhibited: [],
+      literature: [],
+      condition: undefined,
+      currency: saleItem.currency,
+      lowEstimate: saleItem.estimates.low,
+      highEstimate: saleItem.estimates.high,
+      currentBid: saleItem.currentBid,
+      bidsCount: undefined,
+      nextMinBid: saleItem.nextAsks[0]!,
+      images: [],
+    };
+    return lotDetails;
+  } catch {
+    return lotData;
+  }
+}
 
 export default async function LotDetailPage({
   params,
 }: {
-  params: { id: string; lotId: string };
+  params: { auctionId: string; lotId: string };
 }) {
-  console.log((await params).id, (await params).lotId);
+  const lotDetails = await getLotDetails(
+    (
+      await params
+    ).auctionId,
+    (
+      await params
+    ).lotId
+  );
 
-  return <LDP lotData={lotData} />;
+  if (lotDetails === null) return "Something went wrong";
+
+  return <LDP lotData={lotDetails} />;
 }
