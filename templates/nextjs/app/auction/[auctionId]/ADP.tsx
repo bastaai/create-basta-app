@@ -12,8 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { MapPin, Calendar, Clock, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -32,9 +30,6 @@ export type Lot = {
   id: string;
   lotNumber: number;
   title: string | undefined;
-  artist: string | undefined;
-  category: string | undefined;
-  location: string | undefined;
   lowEstimate: number | null;
   highEstimate: number | null;
   image: string | undefined;
@@ -64,8 +59,6 @@ export default function AuctionDetailPage({
   const [loading, setLoading] = useState(false);
 
   // Filters
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("lotNumber");
 
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -73,18 +66,6 @@ export default function AuctionDetailPage({
   // Filter and sort lots
   const getFilteredAndSortedLots = useCallback(() => {
     let filtered = [...allLots];
-
-    if (selectedCategories.length > 0) {
-      filtered = filtered.filter((lot) =>
-        selectedCategories.includes(lot.category || "")
-      );
-    }
-
-    if (selectedLocations.length > 0) {
-      filtered = filtered.filter((lot) =>
-        selectedLocations.includes(lot.location || "")
-      );
-    }
 
     // Sort
     filtered.sort((a, b) => {
@@ -103,14 +84,14 @@ export default function AuctionDetailPage({
     });
 
     return filtered;
-  }, [selectedCategories, selectedLocations, sortBy]);
+  }, [sortBy]);
 
   // Reset and apply filters
   useEffect(() => {
     const filtered = getFilteredAndSortedLots();
     setLots(filtered.slice(0, 12));
     setHasMore(filtered.length > 12);
-  }, [selectedCategories, selectedLocations, sortBy, getFilteredAndSortedLots]);
+  }, [sortBy, getFilteredAndSortedLots]);
 
   // Infinite scroll
   const loadMoreLots = useCallback(() => {
@@ -154,18 +135,6 @@ export default function AuctionDetailPage({
     };
   }, [loadMoreLots]);
 
-  const handleCategoryChange = (category: string, checked: boolean) => {
-    setSelectedCategories((prev) =>
-      checked ? [...prev, category] : prev.filter((c) => c !== category)
-    );
-  };
-
-  const handleLocationChange = (location: string, checked: boolean) => {
-    setSelectedLocations((prev) =>
-      checked ? [...prev, location] : prev.filter((l) => l !== location)
-    );
-  };
-
   const FilterPanel = () => (
     <div className="space-y-6">
       {/* Sort */}
@@ -184,50 +153,6 @@ export default function AuctionDetailPage({
             <SelectItem value="highEstimate">Estimate (High to Low)</SelectItem> */}
           </SelectContent>
         </Select>
-      </div>
-
-      {/* Categories */}
-      <div>
-        <h3 className="mb-3 font-semibold">Categories</h3>
-        <div className="space-y-2">
-          {["Painting", "Sculpture", "Drawing", "Print", "Photography"].map(
-            (category) => (
-              <div key={category} className="flex items-center gap-2">
-                <Checkbox
-                  id={category}
-                  checked={selectedCategories.includes(category)}
-                  onCheckedChange={(checked) =>
-                    handleCategoryChange(category, checked as boolean)
-                  }
-                />
-                <Label htmlFor={category} className="cursor-pointer text-sm">
-                  {category}
-                </Label>
-              </div>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* Locations */}
-      <div>
-        <h3 className="mb-3 font-semibold">Locations</h3>
-        <div className="space-y-2">
-          {["New York", "London", "Paris", "Hong Kong"].map((location) => (
-            <div key={location} className="flex items-center gap-2">
-              <Checkbox
-                id={location}
-                checked={selectedLocations.includes(location)}
-                onCheckedChange={(checked) =>
-                  handleLocationChange(location, checked as boolean)
-                }
-              />
-              <Label htmlFor={location} className="cursor-pointer text-sm">
-                {location}
-              </Label>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -333,15 +258,9 @@ export default function AuctionDetailPage({
                       </Badge>
                     </div>
                     <CardContent className="p-4">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {lot.artist}
-                      </p>
                       <h3 className="mt-1 font-serif text-base font-semibold leading-tight text-balance">
                         {lot.title}
                       </h3>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {lot.category} • {lot.location}
-                      </p>
                       <div className="mt-4 border-t border-border pt-3">
                         {lot.lowEstimate && lot.highEstimate && (
                           <>

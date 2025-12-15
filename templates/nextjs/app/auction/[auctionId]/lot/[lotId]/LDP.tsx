@@ -3,7 +3,7 @@
 import { AuctionNav } from "@/components/auction-nav";
 import { AuctionFooter } from "@/components/auction-footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,15 +25,6 @@ import { useParams } from "next/navigation";
 export type Lot = {
   lotNumber: number;
   title: string | undefined;
-  artist: string | undefined;
-  year: string | undefined;
-  medium: string | undefined;
-  dimensions: string | undefined;
-  signed: string | undefined;
-  provenance: string[];
-  exhibited: string[];
-  literature: string[];
-  condition: string | undefined;
   currency: string | null;
   lowEstimate: number | null;
   highEstimate: number | null;
@@ -62,7 +53,7 @@ export default function LotDetailPage({ lotData }: { lotData: Lot }) {
       <div className="border-b border-border bg-muted/30">
         <div className="container mx-auto px-4 py-4">
           <Link
-            href={`/auction/${params.id}`}
+            href={`/auction/${params.auctionId}`}
             className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -113,9 +104,6 @@ export default function LotDetailPage({ lotData }: { lotData: Lot }) {
                 <h1 className="font-serif text-3xl font-bold leading-tight text-balance md:text-4xl">
                   {lotData.title}
                 </h1>
-                {lotData.artist && (
-                  <p className="mt-2 text-xl text-accent">{lotData.artist}</p>
-                )}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -133,26 +121,6 @@ export default function LotDetailPage({ lotData }: { lotData: Lot }) {
                   <Share2 className="h-5 w-5" />
                 </Button>
               </div>
-            </div>
-
-            {/* Quick Details */}
-            <div className="mb-6 space-y-2 text-sm">
-              <p>
-                <span className="text-muted-foreground">Year:</span>{" "}
-                {lotData.year}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Medium:</span>{" "}
-                {lotData.medium}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Dimensions:</span>{" "}
-                {lotData.dimensions}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Signed:</span>{" "}
-                {lotData.signed}
-              </p>
             </div>
 
             <Separator className="my-6" />
@@ -175,10 +143,16 @@ export default function LotDetailPage({ lotData }: { lotData: Lot }) {
               <CardContent className="p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Current Bid</p>
-                    <p className="text-3xl font-bold">
-                      ${lotData.currentBid?.toLocaleString()}
-                    </p>
+                    {lotData.currentBid && (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Current Bid
+                        </p>
+                        <p className="text-3xl font-bold">
+                          $ {lotData.currentBid?.toLocaleString()}
+                        </p>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-accent">
                     <TrendingUp className="h-5 w-5" />
@@ -288,18 +262,6 @@ export default function LotDetailPage({ lotData }: { lotData: Lot }) {
                 <FileText className="mr-2 h-4 w-4" />
                 Details
               </TabsTrigger>
-              <TabsTrigger
-                value="provenance"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent data-[state=active]:bg-transparent"
-              >
-                Provenance & Exhibition
-              </TabsTrigger>
-              <TabsTrigger
-                value="condition"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent data-[state=active]:bg-transparent"
-              >
-                Condition Report
-              </TabsTrigger>
             </TabsList>
             <TabsContent value="details" className="mt-8">
               <div className="prose prose-sm max-w-none">
@@ -321,64 +283,7 @@ export default function LotDetailPage({ lotData }: { lotData: Lot }) {
                   visual language.
                 </p>
                 <h4 className="mt-8 font-semibold">Literature</h4>
-                <ul className="mt-2 space-y-1">
-                  {lotData.literature.map((item, idx) => (
-                    <li key={idx} className="text-sm text-muted-foreground">
-                      {item}
-                    </li>
-                  ))}
-                </ul>
               </div>
-            </TabsContent>
-            <TabsContent value="provenance" className="mt-8">
-              <div className="grid gap-8 md:grid-cols-2">
-                <div>
-                  <h3 className="mb-4 font-serif text-xl font-bold">
-                    Provenance
-                  </h3>
-                  <ul className="space-y-2">
-                    {lotData.provenance.map((item, idx) => (
-                      <li key={idx} className="text-sm text-muted-foreground">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <h3 className="mb-4 font-serif text-xl font-bold">
-                    Exhibited
-                  </h3>
-                  <ul className="space-y-2">
-                    {lotData.exhibited.map((item, idx) => (
-                      <li key={idx} className="text-sm text-muted-foreground">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </TabsContent>
-            <TabsContent value="condition" className="mt-8">
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="mb-4 font-serif text-xl font-bold">
-                    Condition Report
-                  </h3>
-                  <p className="leading-relaxed text-muted-foreground">
-                    {lotData.condition}
-                  </p>
-                  <Separator className="my-6" />
-                  <p className="text-sm text-muted-foreground">
-                    This condition report has been provided by our conservation
-                    department and is subject to the terms and conditions of
-                    sale. For a more detailed condition report, please contact
-                    our specialists.
-                  </p>
-                  <Button variant="outline" className="mt-4 bg-transparent">
-                    Request Detailed Report
-                  </Button>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
         </div>

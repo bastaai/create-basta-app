@@ -71,27 +71,20 @@ async function getLotDetails(auctionId: string, lotId: string) {
         },
         currentBid: true,
         nextAsks: true,
+        totalBids: true,
+        images: { url: true },
       },
     });
     const lotDetails: Lot = {
       lotNumber: saleItem.itemNumber,
       title: saleItem.title ?? undefined,
-      artist: undefined,
-      year: undefined,
-      medium: undefined,
-      dimensions: undefined,
-      signed: undefined,
-      provenance: [],
-      exhibited: [],
-      literature: [],
-      condition: undefined,
       currency: saleItem.currency,
       lowEstimate: saleItem.estimates.low,
       highEstimate: saleItem.estimates.high,
       currentBid: saleItem.currentBid,
-      bidsCount: undefined,
+      bidsCount: saleItem.totalBids,
       nextMinBid: saleItem.nextAsks[0]!,
-      images: [],
+      images: saleItem.images.map(({ url }) => url),
     };
     return lotDetails;
   } catch {

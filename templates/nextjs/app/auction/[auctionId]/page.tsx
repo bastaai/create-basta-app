@@ -76,6 +76,9 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
               },
               currentBid: true,
               totalBids: true,
+              images: {
+                url: true,
+              },
               // artist: true,
             },
           },
@@ -96,12 +99,9 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
           id: lot.id,
           lotNumber: lot.itemNumber,
           title: lot.title ?? undefined,
-          artist: undefined,
-          category: undefined,
-          location: undefined,
           lowEstimate: lot.estimates.low,
           highEstimate: lot.estimates.high,
-          image: undefined,
+          image: lot.images[0]?.url,
           currentBid: lot.currentBid,
           bidsCount: lot.totalBids,
         };
