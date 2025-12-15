@@ -1,0 +1,328 @@
+"use client"
+
+import { AuctionNav } from "@/components/auction-nav"
+import { AuctionFooter } from "@/components/auction-footer"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { MapPin, Calendar, Clock, SlidersHorizontal } from "lucide-react"
+import Link from "next/link"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+
+// Mock lot data
+const generateLots = (count: number) => {
+  const categories = ["Painting", "Sculpture", "Drawing", "Print", "Photography"]
+  const locations = ["New York", "London", "Paris", "Hong Kong"]
+
+  return Array.from({ length: count }, (_, i) => ({
+    id: `lot-${i + 1}`,
+    lotNumber: i + 1,
+    title: `Exceptional Artwork ${i + 1}`,
+    artist: `Artist Name ${i + 1}`,
+    category: categories[i % categories.length],
+    location: locations[i % locations.length],
+    lowEstimate: 5000 + i * 1000,
+    highEstimate: 10000 + i * 2000,
+    image: `/placeholder.svg?height=300&width=400&query=artwork-${i + 1}`,
+    currentBid: Math.random() > 0.5 ? 6000 + i * 1200 : null,
+    bidsCount: Math.floor(Math.random() * 20),
+  }))
+}
+
+const allLots = generateLots(100)
+
+const auctionDetails = {
+  title: "Modern & Contemporary Art",
+  location: "New York",
+  date: "March 15, 2025",
+  time: "2:00 PM EST",
+  lotsCount: 124,
+  status: "Live Bidding",
+}
+
+export default function AuctionDetailPage() {
+  const [lots, setLots] = useState(allLots.slice(0, 12))
+  const [hasMore, setHasMore] = useState(true)
+  const [loading, setLoading] = useState(false)
+
+  // Filters
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [sortBy, setSortBy] = useState("lotNumber")
+
+  const observerTarget = useRef<HTMLDivElement>(null)
+
+  // Filter and sort lots
+  const getFilteredAndSortedLots = useCallback(() => {
+    let filtered = [...allLots]
+
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter((lot) => selectedCategories.includes(lot.category))
+    }
+
+    if (selectedLocations.length > 0) {
+      filtered = filtered.filter((lot) => selectedLocations.includes(lot.location))
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "lotNumber":
+          return a.lotNumber - b.lotNumber
+        case "lotNumberDesc":
+          return b.lotNumber - a.lotNumber
+        case "lowEstimate":
+          return a.lowEstimate - b.lowEstimate
+        case "highEstimate":
+          return b.highEstimate - a.highEstimate
+        default:
+          return 0
+      }
+    })
+
+    return filtered
+  }, [selectedCategories, selectedLocations, sortBy])
+
+  // Reset and apply filters
+  useEffect(() => {
+    const filtered = getFilteredAndSortedLots()
+    setLots(filtered.slice(0, 12))
+    setHasMore(filtered.length > 12)
+  }, [selectedCategories, selectedLocations, sortBy, getFilteredAndSortedLots])
+
+  // Infinite scroll
+  const loadMoreLots = useCallback(() => {
+    if (loading || !hasMore) return
+
+    setLoading(true)
+    setTimeout(() => {
+      const filtered = getFilteredAndSortedLots()
+      const currentLength = lots.length
+      const nextLots = filtered.slice(currentLength, currentLength + 12)
+
+      if (nextLots.length === 0) {
+        setHasMore(false)
+      } else {
+        setLots((prev) => [...prev, ...nextLots])
+        setHasMore(currentLength + nextLots.length < filtered.length)
+      }
+      setLoading(false)
+    }, 500)
+  }, [lots.length, loading, hasMore, getFilteredAndSortedLots])
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreLots()
+        }
+      },
+      { threshold: 0.1 },
+    )
+
+    const currentTarget = observerTarget.current
+    if (currentTarget) {
+      observer.observe(currentTarget)
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [loadMoreLots])
+
+  const handleCategoryChange = (category: string, checked: boolean) => {
+    setSelectedCategories((prev) => (checked ? [...prev, category] : prev.filter((c) => c !== category)))
+  }
+
+  const handleLocationChange = (location: string, checked: boolean) => {
+    setSelectedLocations((prev) => (checked ? [...prev, location] : prev.filter((l) => l !== location)))
+  }
+
+  const FilterPanel = () => (
+    <div className="space-y-6">
+      {/* Sort */}
+      <div>
+        <h3 className="mb-3 font-semibold">Sort By</h3>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="lotNumber">Lot Number (Low to High)</SelectItem>
+            <SelectItem value="lotNumberDesc">Lot Number (High to Low)</SelectItem>
+            <SelectItem value="lowEstimate">Estimate (Low to High)</SelectItem>
+            <SelectItem value="highEstimate">Estimate (High to Low)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Categories */}
+      <div>
+        <h3 className="mb-3 font-semibold">Categories</h3>
+        <div className="space-y-2">
+          {["Painting", "Sculpture", "Drawing", "Print", "Photography"].map((category) => (
+            <div key={category} className="flex items-center gap-2">
+              <Checkbox
+                id={category}
+                checked={selectedCategories.includes(category)}
+                onCheckedChange={(checked) => handleCategoryChange(category, checked as boolean)}
+              />
+              <Label htmlFor={category} className="cursor-pointer text-sm">
+                {category}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Locations */}
+      <div>
+        <h3 className="mb-3 font-semibold">Locations</h3>
+        <div className="space-y-2">
+          {["New York", "London", "Paris", "Hong Kong"].map((location) => (
+            <div key={location} className="flex items-center gap-2">
+              <Checkbox
+                id={location}
+                checked={selectedLocations.includes(location)}
+                onCheckedChange={(checked) => handleLocationChange(location, checked as boolean)}
+              />
+              <Label htmlFor={location} className="cursor-pointer text-sm">
+                {location}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="min-h-screen">
+      <AuctionNav />
+
+      {/* Auction Header */}
+      <section className="border-b border-border bg-muted/30 py-12">
+        <div className="container mx-auto px-4">
+          <div className="flex items-start justify-between gap-8">
+            <div className="flex-1">
+              <Badge className="mb-4 bg-muted text-foreground">{auctionDetails.status}</Badge>
+              <h1 className="font-serif text-4xl font-bold md:text-5xl">{auctionDetails.title}</h1>
+              <div className="mt-6 flex flex-wrap gap-6 text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  <span>{auctionDetails.location}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>{auctionDetails.date}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span>{auctionDetails.time}</span>
+                </div>
+              </div>
+            </div>
+            <div className="hidden flex-col gap-2 md:flex">
+              <Button size="lg">Register to Bid</Button>
+              <Button size="lg" variant="outline">
+                Download Catalogue
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Lots Grid with Filters */}
+      <section className="container mx-auto px-4 py-12">
+        <div className="flex gap-8">
+          {/* Desktop Filters Sidebar */}
+          <aside className="hidden w-64 shrink-0 lg:block">
+            <div className="sticky top-24">
+              <FilterPanel />
+            </div>
+          </aside>
+
+          {/* Lots Grid */}
+          <div className="flex-1">
+            <div className="mb-6 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {lots.length} of {getFilteredAndSortedLots().length} lots
+              </p>
+
+              {/* Mobile Filter Button */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" className="lg:hidden bg-transparent">
+                    <SlidersHorizontal className="mr-2 h-4 w-4" />
+                    Filters
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left">
+                  <SheetHeader>
+                    <SheetTitle>Filters</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6">
+                    <FilterPanel />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {lots.map((lot) => (
+                <Link key={lot.id} href={`/auction/${lot.id.split("-")[1]}/lot/${lot.lotNumber}`}>
+                  <Card className="group overflow-hidden transition-shadow hover:shadow-lg">
+                    <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+                      <img
+                        src={lot.image || "/placeholder.svg"}
+                        alt={lot.title}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <Badge className="absolute left-4 top-4 bg-background/90 text-foreground">
+                        Lot {lot.lotNumber}
+                      </Badge>
+                    </div>
+                    <CardContent className="p-4">
+                      <p className="text-xs font-medium text-muted-foreground">{lot.artist}</p>
+                      <h3 className="mt-1 font-serif text-base font-semibold leading-tight text-balance">
+                        {lot.title}
+                      </h3>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {lot.category} • {lot.location}
+                      </p>
+                      <div className="mt-4 border-t border-border pt-3">
+                        <p className="text-xs text-muted-foreground">Estimate</p>
+                        <p className="font-semibold">
+                          ${lot.lowEstimate.toLocaleString()} - ${lot.highEstimate.toLocaleString()}
+                        </p>
+                        {lot.currentBid && (
+                          <p className="mt-1 text-sm font-medium">{lot.currentBid.toLocaleString()}</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+
+            {/* Loading indicator / Infinite scroll trigger */}
+            <div ref={observerTarget} className="mt-8 flex justify-center">
+              {loading && <div className="text-sm text-muted-foreground">Loading more lots...</div>}
+              {!hasMore && lots.length > 0 && (
+                <div className="text-sm text-muted-foreground">No more lots to display</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <AuctionFooter />
+    </div>
+  )
+}
