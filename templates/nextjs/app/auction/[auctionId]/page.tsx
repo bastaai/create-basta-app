@@ -14,7 +14,7 @@ const generateLots = (count: number) => {
   const locations = ["New York", "London", "Paris", "Hong Kong"];
 
   return Array.from({ length: count }, (_, i) => ({
-    id: `lot-${i + 1}`,
+    id: `${i + 1}`,
     lotNumber: i + 1,
     title: `Exceptional Artwork ${i + 1}`,
     artist: `Artist Name ${i + 1}`,
@@ -83,6 +83,7 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
       },
     });
     const auctionDetails: Auction = {
+      id,
       title: sale.title ?? undefined,
       status: sale.status,
       // location: sale.location,
@@ -115,10 +116,9 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
 export default async function AuctionDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: { auctionId: string };
 }) {
-  const awaited = await params;
-  const auctionDetails = await getAuctionDetails(awaited.id);
+  const auctionDetails = await getAuctionDetails((await params).auctionId);
 
   if (auctionDetails === null) return "Something went wrong";
 

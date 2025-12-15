@@ -43,6 +43,7 @@ export type Lot = {
 };
 
 export type Auction = {
+  id: string;
   title: string | undefined;
   status: clientApiSchema.SaleStatus | undefined;
   location?: string | undefined;
@@ -318,7 +319,7 @@ export default function AuctionDetailPage({
               {lots.map((lot) => (
                 <Link
                   key={lot.id}
-                  href={`/auction/${lot.id.split("-")[1]}/lot/${lot.lotNumber}`}
+                  href={`/auction/${auctionDetails.id}/lot/${lot.id}`}
                 >
                   <Card className="group overflow-hidden transition-shadow hover:shadow-lg">
                     <div className="relative aspect-[4/3] overflow-hidden bg-muted">
