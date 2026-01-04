@@ -9,6 +9,5 @@ export function finalInstructions(projectDirectory) {
   console.log(`\n🎉 Project '${projectName}' created `);
   console.log(`\nNext steps:`);
   console.log(`  cd ${projectName}`);
-  console.log(`  pnpm install`);
   console.log(`  pnpm dev`);
 }
