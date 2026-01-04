@@ -20,6 +20,40 @@ function checkPnpmInstalled() {
   }
 }
 
+// Check if git is installed
+function checkGitInstalled() {
+  try {
+    execSync("git --version", { stdio: "ignore" });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Initialize git repository and create initial commit
+function initializeGit(projectDir) {
+  console.log("\n🔧 Initializing git repository...");
+  try {
+    execSync("git init", {
+      cwd: projectDir,
+      stdio: "ignore",
+    });
+    execSync("git add .", {
+      cwd: projectDir,
+      stdio: "ignore",
+    });
+    execSync('git commit -m "Initial commit"', {
+      cwd: projectDir,
+      stdio: "ignore",
+    });
+    console.log("✅ Git repository initialized with initial commit");
+    return true;
+  } catch (error) {
+    console.error("\n⚠️  Failed to initialize git repository");
+    return false;
+  }
+}
+
 // Run pnpm install in the project directory
 function installDependencies(projectDir) {
   console.log("\n📦 Installing dependencies...");
@@ -111,5 +145,12 @@ API_KEY=${envVars.apiKey}
 
 // Install dependencies
 installDependencies(projectDir);
+
+// Initialize git repository if git is installed
+if (checkGitInstalled()) {
+  initializeGit(projectDir);
+} else {
+  console.log("\n⚠️  Git is not installed. Skipping git initialization.");
+}
 
 finalInstructions(projectDir);
