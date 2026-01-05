@@ -38,20 +38,18 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
     return { ...auction, lots: allLots };
   }
 
-  if (!process.env.ACCOUNT_ID || !process.env.API_KEY) {
-    console.error("Missing env variables: ACCOUNT_ID | API_KEY");
+  if (!process.env.ACCOUNT_ID) {
+    console.error("Missing env variable: ACCOUNT_ID");
     return null;
   }
 
   const client = createClientApiClient({
-    headers: {
-      "x-account-id": process.env.ACCOUNT_ID,
-      "x-api-key": process.env.API_KEY,
-    },
+    url: "https://client.api.basta.wtf/graphql",
   });
 
   try {
     console.log("fetching auction data...");
+    // Get sale details
     const { sale } = await client.query({
       sale: {
         __args: {
@@ -59,15 +57,36 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
         },
         title: true,
         status: true,
-        // location: true,
         dates: {
           openDate: true,
           closingDate: true,
         },
-        items: {
-          edges: {
-            node: {
+      },
+    });
+
+    // Get items using search endpoint with facets
+    const searchData = await client.query({
+      search: {
+        __args: {
+          accountId: process.env.ACCOUNT_ID,
+          type: "ITEM",
+          query: "*",
+          filterBy: `saleId:${id}`,
+        },
+        facets: {
+          fieldName: true,
+          counts: {
+            value: true,
+            count: true,
+          },
+        },
+        edges: {
+          node: {
+            __typename: true,
+            on_Item: {
               id: true,
+              cursor: true,
+              saleId: true,
               itemNumber: true,
               title: true,
               estimates: {
@@ -79,37 +98,82 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
               images: {
                 url: true,
               },
-              // artist: true,
             },
           },
         },
+        pageInfo: {
+          totalRecords: true,
+        },
       },
     });
+
+    const searchResult = (searchData as any).search;
+    const lots = searchResult?.edges?.map((edge: any) => {
+      const node = edge.node;
+      // Access Item fields through the inline fragment
+      const lot = node.on_Item || node;
+      return {
+        id: lot.id,
+        lotNumber: lot.itemNumber,
+        title: lot.title ?? undefined,
+        lowEstimate: lot.estimates?.low,
+        highEstimate: lot.estimates?.high,
+        image: lot.images?.[0]?.url,
+        currentBid: lot.currentBid,
+        bidsCount: lot.totalBids,
+      };
+    }) || [];
+
     const auctionDetails: Auction = {
       id,
       title: sale.title ?? undefined,
       status: sale.status,
-      // location: sale.location,
       dates: {
         openDate: sale.dates.openDate ?? undefined,
         closingDate: sale.dates.closingDate ?? undefined,
       },
-      lots: sale.items.edges.map(({ node: lot }) => {
-        return {
-          id: lot.id,
-          lotNumber: lot.itemNumber,
-          title: lot.title ?? undefined,
-          lowEstimate: lot.estimates.low,
-          highEstimate: lot.estimates.high,
-          image: lot.images[0]?.url,
-          currentBid: lot.currentBid,
-          bidsCount: lot.totalBids,
-        };
-      }),
+      lots,
     };
     return auctionDetails;
-  } catch {
+  } catch (error) {
+    console.error(error);
     return null;
+  }
+}
+
+async function getFacets(saleId: string) {
+  if (!process.env.ACCOUNT_ID) {
+    return [];
+  }
+
+  const client = createClientApiClient({
+    url: "https://client.api.basta.wtf/graphql",
+  });
+
+  try {
+    const searchData = await client.query({
+      search: {
+        __args: {
+          accountId: process.env.ACCOUNT_ID,
+          type: "ITEM",
+          query: "*",
+          filterBy: `saleId:${saleId}`,
+        },
+        facets: {
+          fieldName: true,
+          counts: {
+            value: true,
+            count: true,
+          },
+        },
+      } as any,
+    });
+
+    const searchResult = (searchData as any).search;
+    return searchResult?.facets || [];
+  } catch (error) {
+    console.error("Error fetching facets:", error);
+    return [];
   }
 }
 
@@ -118,9 +182,18 @@ export default async function AuctionDetailPage({
 }: {
   params: { auctionId: string };
 }) {
-  const auctionDetails = await getAuctionDetails((await params).auctionId);
+  try {
+    const auctionId = (await params).auctionId;
+    const auctionDetails = await getAuctionDetails(auctionId);
+    const facets = await getFacets(auctionId);
 
-  if (auctionDetails === null) return "Something went wrong";
+    if (auctionDetails === null) return "Something went wrong";
 
-  return <ADP auctionDetails={auctionDetails} />;
+    const accountId = process.env.ACCOUNT_ID || "";
+
+    return <ADP auctionDetails={auctionDetails} facets={facets} accountId={accountId} />;
+  } catch (error) {
+    console.error(error);
+    return "Something went wrong";
+  }
 }

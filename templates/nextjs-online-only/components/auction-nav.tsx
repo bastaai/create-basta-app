@@ -25,10 +25,7 @@ export function AuctionNav() {
             <Link href="/" className="text-sm font-medium transition-opacity hover:opacity-60">
               Auctions
             </Link>
-            <Link href="#" className="text-sm font-medium transition-opacity hover:opacity-60">
-              Private Sales
-            </Link>
-            <Link href="#" className="text-sm font-medium transition-opacity hover:opacity-60">
+            <Link href="/departments" className="text-sm font-medium transition-opacity hover:opacity-60">
               Departments
             </Link>
             <Link href="#" className="text-sm font-medium transition-opacity hover:opacity-60">
@@ -61,10 +58,7 @@ export function AuctionNav() {
                   <Link href="/" className="text-lg font-medium">
                     Auctions
                   </Link>
-                  <Link href="#" className="text-lg font-medium">
-                    Private Sales
-                  </Link>
-                  <Link href="#" className="text-lg font-medium">
+                  <Link href="/departments" className="text-lg font-medium">
                     Departments
                   </Link>
                   <Link href="#" className="text-lg font-medium">
