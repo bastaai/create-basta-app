@@ -196,7 +196,7 @@ export default async function HomePage() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url('/elegant-auction-gallery.jpg')`,
+            backgroundImage: `url('/art-gallery.avif')`,
           }}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-background/98 to-background/50" />
@@ -210,21 +210,41 @@ export default async function HomePage() {
               Join our upcoming auctions featuring masterpieces from the world's
               most celebrated artists and makers.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Button size="default" className="font-normal">
-                View All Auctions
-              </Button>
-              <Button
-                size="default"
-                variant="outline"
-                className="bg-background/80 font-normal backdrop-blur-sm"
-              >
-                Request a Valuation
-              </Button>
+            <div className="mt-7">
+              <Link href="/auctions">
+                <Button size="default" className="font-normal">
+                  View All Auctions
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Tags Section */}
+      {allTags.length > 0 && (
+        <section className="border-b border-border/50 bg-muted/10 py-12 md:py-16">
+          <div className="container mx-auto px-4">
+            <div className="mb-8 text-center">
+              <h2 className="font-serif text-2xl font-light tracking-tight md:text-3xl">
+                Browse by Tags
+              </h2>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              {allTags.map((tag) => (
+                <Link key={tag.id} href="/departments">
+                  <Badge
+                    variant="outline"
+                    className="cursor-pointer px-4 py-2 text-sm font-normal transition-all hover:bg-accent hover:scale-105 hover:shadow-sm"
+                  >
+                    {tag.name}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Upcoming Auctions */}
       <section className="container mx-auto px-4 py-20 md:py-28">
@@ -237,10 +257,12 @@ export default async function HomePage() {
               Browse our calendar of exceptional sales
             </p>
           </div>
-          <Button variant="ghost" className="hidden font-normal md:flex">
-            View Calendar
-            <Calendar className="ml-2 h-4 w-4" />
-          </Button>
+          <Link href="/auctions">
+            <Button variant="ghost" className="hidden font-normal md:flex">
+              View Calendar
+              <Calendar className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
         </div>
 
         {upcomingAuctions.length === 0 && (
@@ -410,43 +432,6 @@ export default async function HomePage() {
                 </Link>
               </div>
             )}
-        </section>
-      )}
-
-      {/* Tags Section */}
-      {allTags.length > 0 && (
-        <section className="relative border-y border-border/50 bg-muted/10 py-20 md:py-28">
-          <div className="container mx-auto px-4">
-            <div className="mb-14 text-center">
-              <h2 className="font-serif text-3xl font-light tracking-tight md:text-4xl">
-                Browse by Category
-              </h2>
-              <p className="mt-3 text-base text-muted-foreground">
-                Explore items by their tags and categories
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-3">
-              {allTags.map((tag) => (
-                <Link key={tag.id} href="/departments">
-                  <Badge
-                    variant="outline"
-                    className="cursor-pointer px-4 py-2 text-sm font-normal transition-all hover:bg-accent hover:scale-105 hover:shadow-sm"
-                  >
-                    {tag.name}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-            <div className="mt-10 text-center">
-              <Link href="/departments">
-                <Button variant="outline" className="font-normal">
-                  View All Departments
-                </Button>
-              </Link>
-            </div>
-          </div>
-          {/* Decorative bottom border */}
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         </section>
       )}
 

@@ -1,46 +1,40 @@
 import { createClientApiClient } from "@bastaai/basta-js";
 import LDP, { Lot } from "./LDP";
+import type { SaleRegistration } from "@/components/registration-modal";
 
-// Mock lot data
-const lotData = {
+// Mock lot data (amounts in minor currency - cents)
+const mockLotData: Lot = {
   lotNumber: 42,
   title: "Abstract Composition in Blue and Gold",
-  artist: "Jean-Michel Dubois",
-  year: "1987",
-  medium: "Oil on canvas",
-  dimensions: "120 x 150 cm (47.2 x 59 in)",
-  signed: "Signed and dated lower right",
-  provenance: [
-    "Private Collection, Paris",
-    "Galerie Moderne, Geneva, 2005",
-    "Present owner acquired from the above",
-  ],
-  exhibited: [
-    'Paris, Galerie d\'Art Contemporain, "New Visions", 1988',
-    'Geneva, Museum of Modern Art, "French Masters", 2010',
-  ],
-  literature: [
-    'Dubois, J.M., "Complete Catalogue", Vol. 2, Paris, 2000, illustrated p. 156',
-  ],
-  condition:
-    "Excellent condition. Minor surface dirt visible under magnification.",
-  lowEstimate: 45000,
-  highEstimate: 65000,
   currency: "USD",
-  currentBid: 48000,
+  lowEstimate: 4500000,  // $45,000
+  highEstimate: 6500000, // $65,000
+  currentBid: 4800000,   // $48,000
+  startingBid: 4000000,  // $40,000
   bidsCount: 12,
-  nextMinBid: 50000,
+  nextAsks: [5000000, 5200000, 5500000, 6000000, 6500000], // Available bid amounts
   images: [
     "/abstract-painting-blue-gold.jpg",
     "/abstract-painting-detail-1.jpg",
     "/abstract-painting-detail-2.jpg",
     "/abstract-painting-signature.jpg",
   ],
+  closingDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
 };
 
-async function getLotDetails(auctionId: string, lotId: string) {
+interface LotPageData {
+  lot: Lot;
+  auctionTitle: string;
+  userSaleRegistrations: SaleRegistration[];
+}
+
+async function getLotDetails(auctionId: string, lotId: string): Promise<LotPageData | null> {
   if (["1", "2"].includes(auctionId)) {
-    return lotData;
+    return {
+      lot: mockLotData,
+      auctionTitle: "Spring Contemporary Art Auction",
+      userSaleRegistrations: [],
+    };
   }
 
   if (!process.env.ACCOUNT_ID || !process.env.API_KEY) {
@@ -56,7 +50,8 @@ async function getLotDetails(auctionId: string, lotId: string) {
   });
 
   try {
-    const { saleItem } = await client.query({
+    // Fetch both lot details and sale info
+    const data = await client.query({
       saleItem: {
         __args: {
           saleId: auctionId,
@@ -70,25 +65,59 @@ async function getLotDetails(auctionId: string, lotId: string) {
           high: true,
         },
         currentBid: true,
+        startingBid: true,
         nextAsks: true,
         totalBids: true,
         images: { url: true },
+        dates: {
+          closingEnd: true,
+          closingStart: true,
+          openDate: true,
+        },
+      },
+      sale: {
+        __args: {
+          id: auctionId,
+        },
+        title: true,
+        userSaleRegistrations: {
+          id: true,
+          registrationType: true,
+          saleId: true,
+          status: true,
+          userId: true,
+        },
       },
     });
+
+    const saleItem = data.saleItem;
+    const sale = data.sale;
+
     const lotDetails: Lot = {
       lotNumber: saleItem.itemNumber,
       title: saleItem.title ?? undefined,
       currency: saleItem.currency,
-      lowEstimate: saleItem.estimates.low,
-      highEstimate: saleItem.estimates.high,
+      lowEstimate: saleItem.estimates?.low,
+      highEstimate: saleItem.estimates?.high,
       currentBid: saleItem.currentBid,
+      startingBid: saleItem.startingBid,
       bidsCount: saleItem.totalBids,
-      nextMinBid: saleItem.nextAsks[0]!,
-      images: saleItem.images.map(({ url }) => url),
+      nextAsks: saleItem.nextAsks || [],
+      images: saleItem.images?.map((img: any) => img.url) || [],
+      closingDate: saleItem.dates?.closingEnd ?? null,
     };
-    return lotDetails;
+
+    return {
+      lot: lotDetails,
+      auctionTitle: sale.title ?? "Auction",
+      userSaleRegistrations: sale.userSaleRegistrations || [],
+    };
   } catch {
-    return lotData;
+    return {
+      lot: mockLotData,
+      auctionTitle: "Auction",
+      userSaleRegistrations: [],
+    };
   }
 }
 
@@ -97,16 +126,19 @@ export default async function LotDetailPage({
 }: {
   params: { auctionId: string; lotId: string };
 }) {
-  const lotDetails = await getLotDetails(
-    (
-      await params
-    ).auctionId,
-    (
-      await params
-    ).lotId
+  const auctionId = (await params).auctionId;
+  const lotId = (await params).lotId;
+
+  const data = await getLotDetails(auctionId, lotId);
+
+  if (data === null) return "Something went wrong";
+
+  return (
+    <LDP
+      lotData={data.lot}
+      auctionId={auctionId}
+      auctionTitle={data.auctionTitle}
+      userSaleRegistrations={data.userSaleRegistrations}
+    />
   );
-
-  if (lotDetails === null) return "Something went wrong";
-
-  return <LDP lotData={lotDetails} />;
 }

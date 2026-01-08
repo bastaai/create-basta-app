@@ -3,6 +3,7 @@ import prompts from "prompts";
 import { program } from "commander";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { execSync } from "child_process";
 import { createProject } from "../src/scaffold.js";
 import { replacePlaceholders } from "../src/inject.js";
@@ -133,8 +134,12 @@ if (template === "nextjs-online-only" || template.startsWith("nextjs")) {
     ]);
 
     if (envVars.accountId && envVars.apiKey) {
+      // Generate a random secret for next-auth
+      const nextAuthSecret = crypto.randomBytes(32).toString("base64");
       const envContent = `ACCOUNT_ID=${envVars.accountId}
 API_KEY=${envVars.apiKey}
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=${nextAuthSecret}
 `;
       const envPath = path.join(projectDir, ".env.local");
       fs.writeFileSync(envPath, envContent, "utf8");

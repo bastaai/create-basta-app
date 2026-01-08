@@ -13,19 +13,24 @@ const generateLots = (count: number) => {
   ];
   const locations = ["New York", "London", "Paris", "Hong Kong"];
 
-  return Array.from({ length: count }, (_, i) => ({
-    id: `${i + 1}`,
-    lotNumber: i + 1,
-    title: `Exceptional Artwork ${i + 1}`,
-    artist: `Artist Name ${i + 1}`,
-    category: categories[i % categories.length],
-    location: locations[i % locations.length],
-    lowEstimate: 5000 + i * 1000,
-    highEstimate: 10000 + i * 2000,
-    image: `/placeholder.svg?height=300&width=400&query=artwork-${i + 1}`,
-    currentBid: Math.random() > 0.5 ? 6000 + i * 1200 : null,
-    bidsCount: Math.floor(Math.random() * 20),
-  }));
+  return Array.from({ length: count }, (_, i) => {
+    const startingBid = 500000 + i * 100000; // Starting bid in minor currency (cents)
+    const hasBids = Math.random() > 0.5;
+    return {
+      id: `${i + 1}`,
+      lotNumber: i + 1,
+      title: `Exceptional Artwork ${i + 1}`,
+      artist: `Artist Name ${i + 1}`,
+      category: categories[i % categories.length],
+      location: locations[i % locations.length],
+      lowEstimate: 500000 + i * 100000, // In minor currency
+      highEstimate: 1000000 + i * 200000, // In minor currency
+      image: `/placeholder.svg?height=300&width=400&query=artwork-${i + 1}`,
+      currentBid: hasBids ? startingBid + Math.floor(Math.random() * 500000) : null,
+      startingBid,
+      bidsCount: hasBids ? Math.floor(Math.random() * 20) + 1 : 0,
+    };
+  });
 };
 
 const allLots = generateLots(100);
@@ -48,7 +53,6 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
   });
 
   try {
-    console.log("fetching auction data...");
     // Get sale details
     const { sale } = await client.query({
       sale: {
@@ -57,9 +61,27 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
         },
         title: true,
         status: true,
+        location: true,
+        currency: true,
+        externalId: true,
+        images: { url: true },
+        metafields: {
+          nodes: {
+            key: true,
+            value: true,
+          }
+        },
+        userSaleRegistrations: {
+          id: true,
+          registrationType: true,
+          saleId: true,
+          status: true,
+          userId: true
+        },
         dates: {
           openDate: true,
           closingDate: true,
+          liveDate: true,
         },
       },
     });
@@ -72,6 +94,7 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
           type: "ITEM",
           query: "*",
           filterBy: `saleId:${id}`,
+          orderBy: "itemNumber:asc",
         },
         facets: {
           fieldName: true,
@@ -94,6 +117,7 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
                 high: true,
               },
               currentBid: true,
+              startingBid: true,
               totalBids: true,
               images: {
                 url: true,
@@ -120,6 +144,7 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
         highEstimate: lot.estimates?.high,
         image: lot.images?.[0]?.url,
         currentBid: lot.currentBid,
+        startingBid: lot.startingBid,
         bidsCount: lot.totalBids,
       };
     }) || [];
@@ -133,6 +158,7 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
         closingDate: sale.dates.closingDate ?? undefined,
       },
       lots,
+      userSaleRegistrations: sale.userSaleRegistrations || [],
     };
     return auctionDetails;
   } catch (error) {
