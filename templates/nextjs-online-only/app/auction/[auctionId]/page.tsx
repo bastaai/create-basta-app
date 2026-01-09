@@ -1,6 +1,9 @@
-import { createClientApiClient, type clientApiSchema } from "@bastaai/basta-js";
+import { type clientApiSchema } from "@bastaai/basta-js";
+import { getServerSession } from "next-auth";
 import { mockAuctions } from "@/app/_mocks/auctions";
 import ADP, { Auction, Lot } from "./ADP";
+import { getClientApiClient } from "@/lib/basta-client";
+import { authOptions } from "@/lib/auth";
 
 // Mock lot data
 const generateLots = (count: number) => {
@@ -29,13 +32,14 @@ const generateLots = (count: number) => {
       currentBid: hasBids ? startingBid + Math.floor(Math.random() * 500000) : null,
       startingBid,
       bidsCount: hasBids ? Math.floor(Math.random() * 20) + 1 : 0,
+      reserveMet: hasBids && Math.random() > 0.3 ? true : null, // Randomly set reserve met for some items with bids
     };
   });
 };
 
 const allLots = generateLots(100);
 
-async function getAuctionDetails(id: string): Promise<Auction | null> {
+async function getAuctionDetails(id: string, bidderToken?: string): Promise<Auction | null> {
   if (["1", "2"].includes(id)) {
     const auction = mockAuctions.find((auction) => auction.id === id);
     if (!auction) return null;
@@ -48,9 +52,7 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
     return null;
   }
 
-  const client = createClientApiClient({
-    url: "https://client.api.basta.wtf/graphql",
-  });
+  const client = getClientApiClient(bidderToken);
 
   try {
     // Get sale details
@@ -119,6 +121,7 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
               currentBid: true,
               startingBid: true,
               totalBids: true,
+              reserveMet: true,
               images: {
                 url: true,
               },
@@ -131,7 +134,7 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
       },
     });
 
-    const searchResult = (searchData as any).search;
+    const searchResult = searchData.search;
     const lots = searchResult?.edges?.map((edge: any) => {
       const node = edge.node;
       // Access Item fields through the inline fragment
@@ -146,6 +149,7 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
         currentBid: lot.currentBid,
         startingBid: lot.startingBid,
         bidsCount: lot.totalBids,
+        reserveMet: lot.reserveMet ?? null,
       };
     }) || [];
 
@@ -167,14 +171,12 @@ async function getAuctionDetails(id: string): Promise<Auction | null> {
   }
 }
 
-async function getFacets(saleId: string) {
+async function getFacets(saleId: string, bidderToken?: string) {
   if (!process.env.ACCOUNT_ID) {
     return [];
   }
 
-  const client = createClientApiClient({
-    url: "https://client.api.basta.wtf/graphql",
-  });
+  const client = getClientApiClient(bidderToken);
 
   try {
     const searchData = await client.query({
@@ -192,10 +194,10 @@ async function getFacets(saleId: string) {
             count: true,
           },
         },
-      } as any,
+      },
     });
 
-    const searchResult = (searchData as any).search;
+    const searchResult = searchData.search;
     return searchResult?.facets || [];
   } catch (error) {
     console.error("Error fetching facets:", error);
@@ -210,8 +212,13 @@ export default async function AuctionDetailPage({
 }) {
   try {
     const auctionId = (await params).auctionId;
-    const auctionDetails = await getAuctionDetails(auctionId);
-    const facets = await getFacets(auctionId);
+
+    // Get session for authenticated requests
+    const session = await getServerSession(authOptions);
+    const bidderToken = session?.bidderToken;
+
+    const auctionDetails = await getAuctionDetails(auctionId, bidderToken);
+    const facets = await getFacets(auctionId, bidderToken);
 
     if (auctionDetails === null) return "Something went wrong";
 

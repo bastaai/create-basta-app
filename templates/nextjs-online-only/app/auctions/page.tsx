@@ -7,8 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, MapPin, Clock, CalendarDays, History, Radio } from "lucide-react";
 import Link from "next/link";
 
-import { createClientApiClient } from "@bastaai/basta-js";
 import { DateTime } from "luxon";
+import { getClientApiClient } from "@/lib/basta-client";
 import { Auction, mockAuctions } from "../_mocks/auctions";
 
 async function getAllAuctions() {
@@ -17,9 +17,7 @@ async function getAllAuctions() {
         console.log("returning mock auctions...");
         return mockAuctions;
     }
-    const client = createClientApiClient({
-        url: "https://client.api.basta.wtf/graphql",
-    });
+    const client = getClientApiClient();
 
     try {
         console.log("fetching data...");

@@ -1,25 +1,19 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { mockUsers } from "@/app/_mocks/users";
-import { createManagementApiClient } from "@bastaai/basta-js";
+import { getManagementApiClient, getAccountId } from "@/lib/basta-client";
 
 async function createBidderToken(userId: string): Promise<string | null> {
-    const apiKey = process.env.API_KEY;
-    const accountId = process.env.ACCOUNT_ID;
-
-    if (!apiKey || !accountId) {
-        console.error("Missing API_KEY or ACCOUNT_ID environment variables");
+    if (!userId) {
+        console.error("createBidderToken: userId is required");
         return null;
     }
 
     try {
-        const client = createManagementApiClient({
-            headers: {
-                "x-api-key": apiKey,
-                "x-account-id": accountId,
-            },
-            url: "https://management.api.basta.wtf/graphql",
-        });
+        const client = getManagementApiClient();
+        const accountId = getAccountId();
+
+        console.log("Creating bidder token for user:", userId);
 
         const tokenRes = await client.mutation({
             createBidderToken: {
@@ -29,14 +23,18 @@ async function createBidderToken(userId: string): Promise<string | null> {
                         metadata: {
                             userId: userId,
                             ttl: 3600, // 1 hour TTL
-                            permissions: ["BID_ON_ITEM", "ACCESS_PRIVATE"],
                         }
                     }
                 },
+                __typename: true,
+                token: true,
+                expiration: true,
             },
-        } as any);
+        });
 
-        return (tokenRes as any).createBidderToken || null;
+        const token = tokenRes.createBidderToken?.token || null;
+        console.log("Bidder token created:", token ? "success" : "failed");
+        return token;
     } catch (error) {
         console.error("Failed to create bidder token:", error);
         return null;
@@ -72,11 +70,17 @@ export const authOptions: NextAuthOptions = {
                 token.name = user.name;
                 token.email = user.email;
                 // Fetch bidder token on login
-                token.bidderToken = await createBidderToken(user.id) || undefined;
+                const bidderToken = await createBidderToken(user.id);
+                if (bidderToken) {
+                    token.bidderToken = bidderToken;
+                }
             }
             // Refresh bidder token if it's not present or on update
-            if (trigger === "update" || !token.bidderToken) {
-                token.bidderToken = await createBidderToken(token.id) || undefined;
+            if ((trigger === "update" || !token.bidderToken) && token.id) {
+                const bidderToken = await createBidderToken(token.id as string);
+                if (bidderToken) {
+                    token.bidderToken = bidderToken;
+                }
             }
             return token;
         },

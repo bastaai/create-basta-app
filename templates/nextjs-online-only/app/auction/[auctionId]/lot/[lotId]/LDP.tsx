@@ -3,10 +3,8 @@
 import { AuctionNav } from "@/components/auction-nav";
 import { AuctionFooter } from "@/components/auction-footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -14,29 +12,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
-  Heart,
+  Bell,
   Share2,
-  Gavel,
-  TrendingUp,
-  FileText,
-  Clock,
   Loader2,
-  CheckCircle,
-  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { formatCurrency } from "@/lib/utils";
+import { getClientApiClient } from "@/lib/basta-client";
 import { RegistrationModal, type SaleRegistration } from "@/components/registration-modal";
+
+export type Bid = {
+  id: string;
+  amount: number;
+  maxAmount?: number | null;
+  bidder: string;
+  date: string;
+  bidStatus?: string;
+};
+
+export type UserBid = {
+  bidId: string;
+  amount: number;
+  maxAmount?: number | null;
+  date: string;
+  bidType?: string;
+  bidStatus?: string;
+};
 
 export type Lot = {
   lotNumber: number;
   title: string | undefined;
+  description?: string;
   currency: string | null;
   lowEstimate: number | null;
   highEstimate: number | null;
@@ -46,7 +59,26 @@ export type Lot = {
   nextAsks: number[];
   images: string[];
   closingDate: string | null;
+  reserveMet?: boolean | null;
+  bids?: Bid[];
+  userBids?: UserBid[];
 };
+
+// Helper to format relative time
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
 
 // Countdown timer hook
 function useCountdown(targetDate: string | null) {
@@ -108,133 +140,111 @@ export default function LotDetailPage({
   const { data: session } = useSession();
 
   const [selectedImage, setSelectedImage] = useState(0);
-  // Selected bid amount in minor currency (cents)
   const [selectedBid, setSelectedBid] = useState<string>(
     lotData.nextAsks[0]?.toString() || ""
   );
-  const [watchlisted, setWatchlisted] = useState(false);
   const [registrationModalOpen, setRegistrationModalOpen] = useState(false);
   const [registrations, setRegistrations] = useState<SaleRegistration[]>(userSaleRegistrations);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   const isRegistered = registrations.length > 0;
   const countdown = useCountdown(lotData.closingDate);
 
   const handlePlaceBid = async () => {
-    // Check if user is logged in
     if (!session?.user) {
-      // Redirect to login with callback URL
       const callbackUrl = `/auction/${auctionId}/lot/${params.lotId}`;
       router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
       return;
     }
 
-    // Check if user is registered for the auction
     if (!isRegistered) {
       setRegistrationModalOpen(true);
       return;
     }
 
-    // Check if we have a bidder token
     if (!session.bidderToken) {
       console.error("No bidder token available");
-      // TODO: Show error toast - try logging out and back in
       return;
     }
 
-    // Place the bid directly using the bidder token
     const bidAmount = parseInt(selectedBid, 10);
     setIsPlacingBid(true);
 
     try {
-      const accountId = process.env.NEXT_PUBLIC_ACCOUNT_ID;
+      const client = getClientApiClient(session?.bidderToken);
 
-      const response = await fetch("https://api.basta.wtf/graphql", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.bidderToken}`,
-        },
-        body: JSON.stringify({
-          query: `
-            mutation PlaceBid($accountId: String!, $input: BidOnBehalfInput!) {
-              bidOnBehalf(accountId: $accountId, input: $input) {
-                bidId
-                amount
-                maxAmount
-                userId
-                date
-                bidStatus
-                bidSequenceNumber
-              }
-            }
-          `,
-          variables: {
-            accountId,
-            input: {
-              saleId: auctionId,
-              itemId: params.lotId,
-              amount: bidAmount,
-              userId: session.user.id,
-              type: "MAX",
-            },
+      const result = await client.mutation({
+        bidOnItem: {
+          __args: {
+            saleId: auctionId,
+            itemId: params.lotId as string,
+            amount: bidAmount,
+            type: "MAX",
           },
-        }),
+          __typename: true,
+          on_BidPlacedError: {
+            error: true,
+            errorCode: true,
+          },
+          on_BidPlacedSuccess: {
+            id: true,
+            amount: true,
+            date: true,
+            bidStatus: true,
+          },
+          on_MaxBidPlacedSuccess: {
+            id: true,
+            amount: true,
+            maxAmount: true,
+            bidStatus: true,
+            date: true,
+          },
+        },
       });
 
-      const data = await response.json();
-
-      if (data.errors) {
-        throw new Error(data.errors[0]?.message || "Failed to place bid");
+      const bidResult = result.bidOnItem;
+      if (bidResult?.__typename === "BidPlacedError") {
+        throw new Error(bidResult.error || "Failed to place bid");
       }
 
-      // Bid placed successfully - refresh the page to get updated data
       router.refresh();
     } catch (error) {
       console.error("Error placing bid:", error);
-      // TODO: Show error toast
     } finally {
       setIsPlacingBid(false);
     }
   };
 
+  const description = lotData.description || "This painting captures the ethereal essence of dance, with faded, ghost-like figures gracefully moving across the canvas. At the center, a luminous figure emerges...";
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <AuctionNav />
 
-      {/* Breadcrumb */}
-      <div className="border-b border-border bg-muted/30">
-        <div className="container mx-auto px-4 py-4">
-          <Link
-            href={`/auction/${params.auctionId}`}
-            className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Auction
-          </Link>
-        </div>
-      </div>
+      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-64px)]">
+        {/* Left Column - Images */}
+        <div className="lg:w-1/2 lg:sticky lg:top-0 lg:h-screen flex flex-col">
+          <div className="flex-1 p-4 lg:p-6 flex flex-col">
+            {/* Main Image */}
+            <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl bg-muted">
+              <img
+                src={lotData.images[selectedImage] || "/placeholder.svg"}
+                alt={lotData.title}
+                className="h-full w-full object-cover"
+              />
+            </div>
 
-      <section className="container mx-auto px-4 py-12">
-        <div className="grid gap-12 lg:grid-cols-2">
-          {/* Left Column - Images */}
-          <div>
-            <div className="sticky top-24">
-              <div className="relative aspect-4/3 overflow-hidden rounded-lg bg-muted">
-                <img
-                  src={lotData.images[selectedImage] || "/placeholder.svg"}
-                  alt={lotData.title}
-                  className="h-full w-full object-contain"
-                />
-              </div>
-              <div className="mt-4 grid grid-cols-4 gap-2">
+            {/* Thumbnail Navigation */}
+            {lotData.images.length > 1 && (
+              <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
                 {lotData.images.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(idx)}
-                    className={`relative aspect-square overflow-hidden rounded border-2 transition-all ${selectedImage === idx
-                      ? "border-accent"
-                      : "border-border hover:border-accent/50"
+                    className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg transition-all ${selectedImage === idx
+                      ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                      : "opacity-60 hover:opacity-100"
                       }`}
                   >
                     <img
@@ -245,247 +255,241 @@ export default function LotDetailPage({
                   </button>
                 ))}
               </div>
-            </div>
+            )}
           </div>
+        </div>
 
-          {/* Right Column - Details & Bidding */}
-          <div>
-            <div className="mb-6 flex items-start justify-between gap-4">
+        {/* Right Column - Details */}
+        <div className="lg:w-1/2 p-4 lg:p-8 lg:pt-6">
+          <div className="max-w-lg mx-auto lg:mx-0">
+            {/* Breadcrumb */}
+            <Link
+              href={`/auction/${params.auctionId}`}
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground mb-4"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {auctionTitle}
+            </Link>
+
+            {/* Title */}
+            <h1 className="font-serif text-3xl lg:text-4xl font-bold leading-tight mb-6">
+              {lotData.title}
+            </h1>
+
+            {/* Stats Row */}
+            <div className="flex items-center gap-6 lg:gap-8 mb-6 text-sm">
+              {/* Countdown */}
               <div>
-                <Badge className="mb-3">Lot {lotData.lotNumber}</Badge>
-                <h1 className="font-serif text-3xl font-bold leading-tight text-balance md:text-4xl">
-                  {lotData.title}
-                </h1>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setWatchlisted(!watchlisted)}
-                >
-                  <Heart
-                    className={`h-5 w-5 ${watchlisted ? "fill-current text-accent" : ""
-                      }`}
-                  />
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Share2 className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-
-            <Separator className="my-6" />
-
-            {/* Estimate */}
-            {lotData.lowEstimate && lotData.highEstimate && (
-              <>
-                <div className="mb-6">
-                  <p className="text-sm text-muted-foreground">Estimate</p>
-                  <p className="text-2xl font-bold">
-                    {formatCurrency(lotData.lowEstimate)} - {formatCurrency(lotData.highEstimate)}
-                  </p>
+                <p className="text-muted-foreground">Ends in</p>
+                <div className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${countdown.isExpired ? "bg-destructive" : "bg-green-500"}`} />
+                  <span className="font-semibold">
+                    {countdown.isExpired
+                      ? "Closed"
+                      : `${countdown.days > 0 ? `${countdown.days}d ` : ""}${countdown.hours}h ${countdown.minutes}m ${countdown.seconds}s`
+                    }
+                  </span>
                 </div>
-              </>
-            )}
+              </div>
 
-            {/* Bidding Card */}
-            <Card className="mb-6 border-accent/50 bg-accent/5">
-              <CardContent className="p-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    {lotData.currentBid ? (
-                      <>
-                        <p className="text-sm text-muted-foreground">
-                          Current Bid
-                        </p>
-                        <p className="text-3xl font-bold">
-                          {formatCurrency(lotData.currentBid)}
-                        </p>
-                      </>
-                    ) : lotData.startingBid ? (
-                      <>
-                        <p className="text-sm text-muted-foreground">
-                          Starting Bid
-                        </p>
-                        <p className="text-3xl font-bold">
-                          {formatCurrency(lotData.startingBid)}
-                        </p>
-                      </>
-                    ) : null}
-                  </div>
-                  {lotData.bidsCount !== undefined && lotData.bidsCount > 0 && (
-                    <div className="flex items-center gap-2 text-accent">
-                      <TrendingUp className="h-5 w-5" />
-                      <span className="text-sm font-medium">
-                        {lotData.bidsCount} {lotData.bidsCount === 1 ? "bid" : "bids"}
-                      </span>
-                    </div>
-                  )}
-                </div>
+              {/* Current Bid */}
+              <div>
+                <p className="text-muted-foreground">Current bid</p>
+                <p className="font-semibold">
+                  {lotData.currentBid
+                    ? formatCurrency(lotData.currentBid)
+                    : lotData.startingBid
+                      ? formatCurrency(lotData.startingBid)
+                      : "No bids"
+                  }
+                </p>
+              </div>
 
-                {/* Registration Status - only show when registered */}
-                {session?.user && isRegistered && (
-                  <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-                    <CheckCircle className="h-4 w-4" />
-                    <span className="text-sm font-medium">Registered to Bid</span>
-                  </div>
-                )}
+              {/* Reserve Status */}
+              <div>
+                <p className="text-muted-foreground">Minimum</p>
+                <p className="font-semibold">
+                  {lotData.reserveMet ? "Met" : lotData.currentBid ? "Not met" : "—"}
+                </p>
+              </div>
 
-                {/* Bid Form */}
-                {lotData.nextAsks.length > 0 && (
-                  <div className="space-y-3">
+              {/* User's Max Bid */}
+              {lotData.userBids && lotData.userBids.length > 0 && (() => {
+                // Find the newest max bid (highest maxAmount from bids with maxAmount > 0)
+                const maxBids = lotData.userBids
+                  .filter(b => b.maxAmount && b.maxAmount > 0)
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                const newestMaxBid = maxBids[0];
+
+                if (!newestMaxBid) {
+                  // No max bids, show the latest regular bid
+                  const latestBid = lotData.userBids.sort((a, b) =>
+                    new Date(b.date).getTime() - new Date(a.date).getTime()
+                  )[0];
+                  return (
                     <div>
-                      <Label htmlFor="bidAmount" className="text-sm">
-                        Select Your Bid
-                      </Label>
-                      <Select value={selectedBid} onValueChange={setSelectedBid}>
-                        <SelectTrigger className="mt-1.5 w-full">
-                          <SelectValue placeholder="Select bid amount" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {lotData.nextAsks.map((amount) => (
-                            <SelectItem key={amount} value={amount.toString()}>
-                              {formatCurrency(amount)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      size="lg"
-                      className="w-full"
-                      onClick={handlePlaceBid}
-                      disabled={isPlacingBid}
-                    >
-                      {isPlacingBid ? (
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      ) : (
-                        <Gavel className="mr-2 h-5 w-5" />
-                      )}
-                      {isPlacingBid
-                        ? "Placing Bid..."
-                        : session?.user && !isRegistered
-                          ? "Register to Place Bid"
-                          : "Place Bid"}
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      By placing a bid, you agree to our Terms & Conditions
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Auction Countdown */}
-            {lotData.closingDate && (
-              <Card className="mb-6">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3 text-sm">
-                    <Clock className={`h-4 w-4 ${countdown.isExpired ? "text-destructive" : "text-muted-foreground"}`} />
-                    <div className="flex-1">
-                      {countdown.isExpired ? (
-                        <p className="font-medium text-destructive">Auction Closed</p>
-                      ) : (
-                        <>
-                          <p className="font-medium">
-                            {countdown.days > 0 && `${countdown.days}d `}
-                            {countdown.hours}h {countdown.minutes}m {countdown.seconds}s
-                          </p>
-                          <p className="text-muted-foreground">
-                            Closes {new Date(lotData.closingDate).toLocaleDateString("en-US", {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Bid History */}
-            {/* <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <TrendingUp className="h-5 w-5" />
-                  Bid History
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {bidHistory.slice(0, 5).map((bid) => (
-                    <div
-                      key={bid.id}
-                      className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0"
-                    >
-                      <div>
-                        <p className="font-semibold">
-                          ${bid.amount.toLocaleString()}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {bid.bidder}
-                        </p>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {bid.time}
+                      <p className="text-muted-foreground">Your bid</p>
+                      <p className="font-semibold text-primary">
+                        {formatCurrency(latestBid.amount)}
                       </p>
                     </div>
-                  ))}
+                  );
+                }
+
+                return (
+                  <div>
+                    <p className="text-muted-foreground">Your max bid</p>
+                    <p className="font-semibold text-primary">
+                      {formatCurrency(newestMaxBid.maxAmount!)}
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 mb-6">
+              <Button variant="secondary" size="icon" className="rounded-full h-10 w-10">
+                <Bell className="h-4 w-4" />
+              </Button>
+              <Button variant="secondary" size="icon" className="rounded-full h-10 w-10">
+                <Share2 className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Description */}
+            <div className="mb-6">
+              <p className="text-sm text-muted-foreground mb-1">Description</p>
+              <p className="text-sm leading-relaxed">
+                {showFullDescription ? description : `${description.slice(0, 150)}...`}
+              </p>
+              <button
+                onClick={() => setShowFullDescription(!showFullDescription)}
+                className="text-sm text-primary font-medium mt-1"
+              >
+                {showFullDescription ? "Show less" : "Read more"}
+              </button>
+            </div>
+
+            {/* Place Bid Button */}
+            <div className="mb-8">
+              {lotData.nextAsks.length > 0 && (
+                <Select value={selectedBid} onValueChange={setSelectedBid}>
+                  <SelectTrigger className="w-full mb-3">
+                    <SelectValue placeholder="Select bid amount" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lotData.nextAsks.map((amount) => (
+                      <SelectItem key={amount} value={amount.toString()}>
+                        {formatCurrency(amount)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={handlePlaceBid}
+                disabled={isPlacingBid || countdown.isExpired}
+              >
+                {isPlacingBid ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : null}
+                {isPlacingBid
+                  ? "Placing Bid..."
+                  : session?.user && !isRegistered
+                    ? "Register to Place Bid"
+                    : "Place Bid"}
+              </Button>
+            </div>
+
+            {/* Bid History */}
+            {lotData.bids && lotData.bids.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="font-semibold">Bid history</span>
+                  <span className="text-muted-foreground">{lotData.bidsCount || lotData.bids.length}</span>
                 </div>
-                <Button
-                  variant="outline"
-                  className="mt-4 w-full bg-transparent"
-                  size="sm"
-                >
-                  View All {lotData.bidsCount} Bids
-                </Button>
-              </CardContent>
-            </Card> */}
+
+                <div className="space-y-2">
+                  {[...lotData.bids].reverse().map((bid, index) => {
+                    // Check if this bid matches any of the user's bids
+                    const isCurrentUser = lotData.userBids?.some(ub => ub.bidId === bid.id) || false;
+                    const hasMaxBid = bid.maxAmount && bid.maxAmount > bid.amount;
+                    const isWinning = bid.bidStatus === "WINNING";
+
+                    return (
+                      <div
+                        key={bid.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl ${isCurrentUser
+                          ? "bg-primary/10"
+                          : "bg-muted/50"
+                          }`}
+                      >
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className={isCurrentUser ? "bg-primary/20" : ""}>
+                            {bid.bidder.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            {isWinning && (
+                              <Badge variant="secondary" className="text-xs bg-primary text-primary-foreground">
+                                Winning
+                              </Badge>
+                            )}
+                            <span className="text-xs text-muted-foreground">{formatRelativeTime(bid.date)}</span>
+                          </div>
+                          <p className="font-medium truncate">
+                            {isCurrentUser ? "(You) " : ""}{bid.bidder}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {hasMaxBid && (
+                            <Badge variant="outline" className="text-xs mb-1">
+                              Max bid
+                            </Badge>
+                          )}
+                          <p className="font-semibold">{formatCurrency(bid.amount)}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Previous / Next Navigation */}
+            <div className="flex gap-4 pb-8">
+              <Link
+                href={`/auction/${auctionId}/lot/${Math.max(1, lotData.lotNumber - 1)}`}
+                className="flex-1 flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <div className="h-12 w-12 rounded-lg bg-muted overflow-hidden shrink-0">
+                  <img src="/placeholder.svg" alt="Previous lot" className="h-full w-full object-cover" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Previous</span>
+                </div>
+              </Link>
+              <Link
+                href={`/auction/${auctionId}/lot/${lotData.lotNumber + 1}`}
+                className="flex-1 flex items-center justify-end gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Next</span>
+                </div>
+                <div className="h-12 w-12 rounded-lg bg-muted overflow-hidden shrink-0">
+                  <img src="/placeholder.svg" alt="Next lot" className="h-full w-full object-cover" />
+                </div>
+              </Link>
+            </div>
           </div>
         </div>
-
-        {/* Detailed Information Tabs */}
-        <div className="mt-16">
-          <Tabs defaultValue="details" className="w-full">
-            <TabsList className="w-full justify-start border-b border-border bg-transparent p-0">
-              <TabsTrigger
-                value="details"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent data-[state=active]:bg-transparent"
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                Details
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="details" className="mt-8">
-              <div className="prose prose-sm max-w-none">
-                <h3 className="font-serif text-2xl font-bold">
-                  About This Work
-                </h3>
-                <p className="mt-4 leading-relaxed text-muted-foreground">
-                  This exceptional abstract composition represents a pivotal
-                  moment in Jean-Michel Dubois's career, created during his most
-                  productive period in the late 1980s. The work exemplifies his
-                  mastery of color theory and compositional balance, with
-                  vibrant blues contrasting against luminous gold tones.
-                </p>
-                <p className="mt-4 leading-relaxed text-muted-foreground">
-                  The painting's dynamic energy and sophisticated layering
-                  technique demonstrate Dubois's innovative approach to abstract
-                  expressionism, drawing inspiration from both European and
-                  American traditions while developing a distinctly personal
-                  visual language.
-                </p>
-                <h4 className="mt-8 font-semibold">Literature</h4>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </section>
+      </div>
 
       <AuctionFooter />
 
@@ -502,14 +506,3 @@ export default function LotDetailPage({
     </div>
   );
 }
-
-const bidHistory = [
-  { id: 1, amount: 48000, bidder: "Bidder #7352", time: "2 minutes ago" },
-  { id: 2, amount: 46000, bidder: "Bidder #2891", time: "15 minutes ago" },
-  { id: 3, amount: 44000, bidder: "Bidder #7352", time: "28 minutes ago" },
-  { id: 4, amount: 42000, bidder: "Bidder #5623", time: "45 minutes ago" },
-  { id: 5, amount: 40000, bidder: "Bidder #2891", time: "1 hour ago" },
-  { id: 6, amount: 38000, bidder: "Bidder #7352", time: "2 hours ago" },
-  { id: 7, amount: 36000, bidder: "Bidder #1024", time: "3 hours ago" },
-  { id: 8, amount: 34000, bidder: "Bidder #5623", time: "5 hours ago" },
-];

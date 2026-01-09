@@ -21,8 +21,9 @@ import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 
 import { DateTime } from "luxon";
-import { clientApiSchema, createClientApiClient } from "@bastaai/basta-js";
+import { clientApiSchema } from "@bastaai/basta-js";
 import { translateItemStatus, formatCurrency, toMajorCurrency } from "@/lib/utils";
+import { getClientApiClient } from "@/lib/basta-client";
 import { RegistrationModal, type SaleRegistration } from "@/components/registration-modal";
 
 // Import the reusable filter system
@@ -41,13 +42,15 @@ import {
 } from "@/lib/filters";
 
 // Sort options for lots
-type LotSortValue = "lotNumber" | "lotNumberDesc" | "estimateAsc" | "estimateDesc";
+type LotSortValue = "lotNumber" | "lotNumberDesc" | "lowEstimateAsc" | "lowEstimateDesc" | "highEstimateAsc" | "highEstimateDesc";
 
 const SORT_OPTIONS: SortOption<LotSortValue>[] = [
   { value: "lotNumber", label: "Lot Number (Low to High)", sortBy: "itemNumber:asc" },
   { value: "lotNumberDesc", label: "Lot Number (High to Low)", sortBy: "itemNumber:desc" },
-  { value: "estimateAsc", label: "Estimate (Low to High)", sortBy: "lowEstimate:asc" },
-  { value: "estimateDesc", label: "Estimate (High to Low)", sortBy: "highEstimate:desc" },
+  { value: "lowEstimateAsc", label: "Low Estimate (Low to High)", sortBy: "lowEstimate:asc" },
+  { value: "lowEstimateDesc", label: "Low Estimate (High to Low)", sortBy: "lowEstimate:desc" },
+  { value: "highEstimateAsc", label: "High Estimate (Low to High)", sortBy: "highEstimate:asc" },
+  { value: "highEstimateDesc", label: "High Estimate (High to Low)", sortBy: "highEstimate:desc" },
 ];
 
 export type Lot = {
@@ -60,6 +63,7 @@ export type Lot = {
   currentBid: number | null;
   startingBid: number | null;
   bidsCount: number | undefined;
+  reserveMet: boolean | null;
 };
 
 export type Auction = {
@@ -95,7 +99,7 @@ export default function AuctionDetailPage({
   accountId: string;
 }) {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
 
   const [lots, setLots] = useState<Lot[]>(auctionDetails.lots.slice(0, 12));
   const [loading, setLoading] = useState(false);
@@ -165,6 +169,11 @@ export default function AuctionDetailPage({
   // Fetch filtered lots when filters or sort change
   useEffect(() => {
     const loadFilteredLots = async () => {
+      // Wait for session to load before making API calls (to get bidder token)
+      if (sessionStatus === "loading") {
+        return;
+      }
+
       // Fallback to local filtering if no accountId
       if (!accountId) {
         let filtered = [...auctionDetails.lots];
@@ -174,9 +183,13 @@ export default function AuctionDetailPage({
               return a.lotNumber - b.lotNumber;
             case "lotNumberDesc":
               return b.lotNumber - a.lotNumber;
-            case "estimateAsc":
+            case "lowEstimateAsc":
               return (a.lowEstimate || 0) - (b.lowEstimate || 0);
-            case "estimateDesc":
+            case "lowEstimateDesc":
+              return (b.lowEstimate || 0) - (a.lowEstimate || 0);
+            case "highEstimateAsc":
+              return (a.highEstimate || 0) - (b.highEstimate || 0);
+            case "highEstimateDesc":
               return (b.highEstimate || 0) - (a.highEstimate || 0);
             default:
               return 0;
@@ -192,9 +205,7 @@ export default function AuctionDetailPage({
       // Always make API call when we have an accountId
       setLoading(true);
       try {
-        const client = createClientApiClient({
-          url: "https://client.api.basta.wtf/graphql",
-        });
+        const client = getClientApiClient(session?.bidderToken);
 
         // Use the reusable filter builder with range support
         const filterBy = buildTypesenseFilter(
@@ -205,6 +216,7 @@ export default function AuctionDetailPage({
         const sortByValue = getSortString(filters.sortBy, SORT_OPTIONS);
 
         console.log("Making API call with filterBy:", filterBy);
+        console.log("Selected facets:", filters.selectedFacets);
 
         const searchData = await client.query({
           search: {
@@ -233,6 +245,7 @@ export default function AuctionDetailPage({
                   currentBid: true,
                   startingBid: true,
                   totalBids: true,
+                  reserveMet: true,
                   images: {
                     url: true,
                   },
@@ -251,7 +264,7 @@ export default function AuctionDetailPage({
           },
         });
 
-        const searchResult = (searchData as any).search;
+        const searchResult = searchData.search;
         const fetchedLots: Lot[] =
           searchResult?.edges?.map((edge: any) => {
             const lot = edge.node.on_Item || edge.node;
@@ -265,6 +278,7 @@ export default function AuctionDetailPage({
               currentBid: lot.currentBid,
               startingBid: lot.startingBid,
               bidsCount: lot.totalBids,
+              reserveMet: lot.reserveMet ?? null,
             };
           }) || [];
 
@@ -288,6 +302,8 @@ export default function AuctionDetailPage({
     auctionDetails.id,
     auctionDetails.lots,
     itemsPerPage,
+    sessionStatus,
+    session?.bidderToken,
   ]);
 
   const dt = auctionDetails.dates.openDate
@@ -548,6 +564,13 @@ export default function AuctionDetailPage({
                             Starting bid: {formatCurrency(lot.startingBid)}
                           </p>
                         ) : null}
+                        {lot.reserveMet === true && (
+                          <div className="mt-2">
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              Reserve Met
+                            </Badge>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

@@ -126,25 +126,52 @@ export function BooleanFacetFilter({
     }
 
     // Find the "true" value from counts
+    // Check for various representations of true
     const trueValue = facet.counts.find(
-        (count) =>
-            count.value.toLowerCase() === "true" ||
-            count.value.toLowerCase() === "yes" ||
-            count.value === "1"
+        (count) => {
+            const val = count.value.toLowerCase();
+            return val === "true" || val === "yes" || val === "1";
+        }
     );
 
-    const valueToUse = trueValue?.value || facet.counts[0]?.value;
-    const countToShow = trueValue?.count || facet.counts[0]?.count || 0;
-    const isSelected = selectedValues.length > 0 && selectedValues.includes(valueToUse);
-    const displayLabel = label || formatFieldName(facet.fieldName);
+    // Also check for false values to ensure we're using the right one
+    const falseValue = facet.counts.find(
+        (count) => {
+            const val = count.value.toLowerCase();
+            return val === "false" || val === "no" || val === "0";
+        }
+    );
+
+    // For "Yes" checkbox, we always want to use the true value
+    // If no true value exists, try to find a value that's not false
+    // If only false exists, we can't show this filter (return null)
+    let valueToUse: string | undefined;
+    let countToShow = 0;
+
+    if (trueValue) {
+        valueToUse = trueValue.value;
+        countToShow = trueValue.count;
+    } else if (falseValue && facet.counts.length > 1) {
+        // If there's a false value but also other values, use the first non-false value
+        const nonFalseValue = facet.counts.find(c => c.value.toLowerCase() !== falseValue.value.toLowerCase());
+        valueToUse = nonFalseValue?.value;
+        countToShow = nonFalseValue?.count || 0;
+    } else if (!falseValue && facet.counts.length > 0) {
+        // If there's no false value, use the first value (might be a different representation)
+        valueToUse = facet.counts[0].value;
+        countToShow = facet.counts[0].count;
+    }
 
     if (!valueToUse) return null;
+
+    const isSelected = selectedValues.length > 0 && selectedValues.includes(valueToUse);
+    const displayLabel = label || formatFieldName(facet.fieldName);
 
     const handleToggle = () => {
         if (isSelected) {
             onClear();
         } else {
-            onToggle(valueToUse);
+            onToggle(valueToUse!); // Safe to use ! here since we checked above
         }
     };
 

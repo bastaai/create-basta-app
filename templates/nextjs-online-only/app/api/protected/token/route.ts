@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createManagementApiClient } from "@bastaai/basta-js";
+import { getManagementApiClient, getAccountId } from "@/lib/basta-client";
 
 export async function POST(request: NextRequest) {
     try {
@@ -15,25 +15,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get API credentials from environment
-        const apiKey = process.env.API_KEY;
-        const accountId = process.env.ACCOUNT_ID;
-
-        if (!apiKey || !accountId) {
-            console.error("Missing API_KEY or ACCOUNT_ID environment variables");
-            return NextResponse.json(
-                { error: "Server configuration error" },
-                { status: 500 }
-            );
-        }
-
-        const client = createManagementApiClient({
-            headers: {
-                "x-api-key": apiKey,
-                "x-account-id": accountId,
-            },
-            url: "https://management.api.basta.wtf/graphql",
-        });
+        const client = getManagementApiClient();
+        const accountId = getAccountId();
 
         // Create bidder token for this user
         const tokenRes = await client.mutation({
@@ -44,16 +27,17 @@ export async function POST(request: NextRequest) {
                         metadata: {
                             userId: session.user.id,
                             ttl: 3600, // 1 hour TTL
-                            permissions: ["BID_ON_ITEM", "ACCESS_PRIVATE"],
                         }
                     }
                 },
+                __typename: true,
+                token: true,
+                expiration: true,
             },
-        } as any);
+        });
 
-        const bidderToken = (tokenRes as any).createBidderToken;
-
-        if (!bidderToken) {
+        const bidderToken = tokenRes.createBidderToken;
+        if (!bidderToken?.token) {
             return NextResponse.json(
                 { error: "Failed to create bidder token" },
                 { status: 500 }
@@ -61,7 +45,8 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({
-            token: bidderToken,
+            token: bidderToken.token,
+            expiration: bidderToken.expiration,
         });
     } catch (error) {
         console.error("Token creation error:", error);

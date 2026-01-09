@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Clock } from "lucide-react";
 import Link from "next/link";
 
-import { createClientApiClient } from "@bastaai/basta-js";
 import { DateTime } from "luxon";
+import { getClientApiClient } from "@/lib/basta-client";
 import { Auction, mockAuctions } from "./_mocks/auctions";
 
 type Tag = {
@@ -21,9 +21,7 @@ async function getAllAuctions() {
     console.log("returning mock auctions...");
     return mockAuctions;
   }
-  const client = createClientApiClient({
-    url: "https://client.api.basta.wtf/graphql",
-  });
+  const client = getClientApiClient();
 
   try {
     console.log("fetching data...");
@@ -100,12 +98,7 @@ async function getAllTags(): Promise<Tag[]> {
     console.log("fetching tags from search endpoint...");
 
     // Use the SDK's search query to get facets (which contain tags)
-    const client = createClientApiClient({
-      headers: {
-        "x-account-id": process.env.ACCOUNT_ID,
-      },
-      url: "https://client.api.basta.wtf/graphql",
-    });
+    const client = getClientApiClient();
 
     // Query search endpoint to get facets
     const searchData = await client.query({
@@ -127,7 +120,7 @@ async function getAllTags(): Promise<Tag[]> {
 
     // Extract tags from facets
     const tags: Tag[] = [];
-    const searchResult = (searchData as any).search;
+    const searchResult = searchData.search;
 
     if (searchResult?.facets && Array.isArray(searchResult.facets)) {
       // Find the tags facet

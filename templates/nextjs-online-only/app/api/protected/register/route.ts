@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createManagementApiClient } from "@bastaai/basta-js";
+import { getManagementApiClient, getAccountId } from "@/lib/basta-client";
 
 export async function POST(request: NextRequest) {
     try {
@@ -27,25 +27,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get API credentials from environment
-        const apiKey = process.env.API_KEY;
-        const accountId = process.env.ACCOUNT_ID;
-
-        if (!apiKey || !accountId) {
-            console.error("Missing API_KEY or ACCOUNT_ID environment variables");
-            return NextResponse.json(
-                { error: "Server configuration error" },
-                { status: 500 }
-            );
-        }
-
-        const client = createManagementApiClient({
-            headers: {
-                "x-api-key": apiKey,
-                "x-account-id": accountId,
-            },
-            url: "https://management.api.basta.wtf/graphql",
-        });
+        const client = getManagementApiClient();
+        const accountId = getAccountId();
 
         const res = await client.mutation({
             createSaleRegistration: {

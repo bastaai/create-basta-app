@@ -105,8 +105,18 @@ export function buildTypesenseFilter(
         const mappedFieldName = config?.fieldMappings?.[fieldName] || fieldName;
 
         if (isBooleanField(fieldName, config)) {
-            // Boolean fields: use exact value with = operator
-            filters.push(`${mappedFieldName}:=${values[0]}`);
+            // Boolean fields: normalize the value and use correct Typesense syntax
+            const boolValue = values[0].toLowerCase();
+            // Convert string representations to actual boolean values for Typesense
+            const normalizedValue =
+                boolValue === "true" || boolValue === "yes" || boolValue === "1"
+                    ? "true"
+                    : boolValue === "false" || boolValue === "no" || boolValue === "0"
+                        ? "false"
+                        : values[0]; // Use original value if not recognized
+            // Typesense boolean syntax: for boolean fields, use field:=true or field:=false
+            // Note: The = operator ensures exact match for boolean values
+            filters.push(`${mappedFieldName}:=${normalizedValue}`);
         } else if (isArrayField(fieldName, config)) {
             // Array fields: always use array syntax
             const escapedValues = values.map(escapeTypesenseValue);
@@ -128,8 +138,27 @@ export function buildTypesenseFilter(
         Object.entries(selectedRanges).forEach(([fieldName, range]) => {
             if (range && range.min !== undefined && range.max !== undefined) {
                 const mappedFieldName = config?.fieldMappings?.[fieldName] || fieldName;
-                // Typesense range syntax: field:[min..max]
-                filters.push(`${mappedFieldName}:[${range.min}..${range.max}]`);
+
+                // Special handling for estimate ranges: use two conditions
+                // Show items whose estimate range overlaps with the selected range
+                // lowEstimate:<=max && highEstimate:>=min
+                const fieldNameLower = fieldName.toLowerCase();
+                const isEstimateRange =
+                    fieldNameLower === "lowestimate" ||
+                    fieldNameLower === "low_estimate" ||
+                    fieldNameLower.includes("estimate");
+
+                if (isEstimateRange) {
+                    // For estimates, we want items whose estimate range overlaps with the selected range:
+                    // - lowEstimate <= max (item's low estimate is at most the search maximum, so it starts within or before the range)
+                    // - highEstimate >= min (item's high estimate is at least the search minimum, so it ends within or after the range)
+                    // Example: Item with $100-$100000 will match search range $200-$500 because ranges overlap
+                    filters.push(`lowEstimate:<=${range.max}`);
+                    filters.push(`highEstimate:>=${range.min}`);
+                } else {
+                    // Standard range syntax: field:[min..max]
+                    filters.push(`${mappedFieldName}:[${range.min}..${range.max}]`);
+                }
             }
         });
     }
