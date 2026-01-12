@@ -128,8 +128,6 @@ export default function AuctionDetailPage({
     setRegistrationModalOpen(true);
   };
 
-  console.log("localtion", auctionDetails.location);
-
   // Calculate estimate range from lots
   const estimateRange = useMemo(() => {
     const estimates = auctionDetails.lots

@@ -244,16 +244,11 @@ export default function LotDetailPage({
   });
 
   useEffect(() => {
-
-    console.log("saleActivityData", saleActivityData?.saleActivity?.__typename);
-
     if (saleActivityData?.saleActivity?.__typename === "Item") {
-      console.log("update lot data");
       setLotData(mapItemToLot(saleActivityData.saleActivity));
       setSelectedBid(saleActivityData.saleActivity.nextAsks[0]?.toString() || "");
     }
     if (saleActivityData?.saleActivity?.__typename === "Sale") {
-      console.log("update sale data");
       setSaleData(mapSaleToSale(saleActivityData.saleActivity));
     }
   }, [saleActivityData])

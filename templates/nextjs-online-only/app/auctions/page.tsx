@@ -20,7 +20,6 @@ async function getAllAuctions() {
     const client = getClientApiClient();
 
     try {
-        console.log("fetching data...");
         const sales = await client.query({
             sales: {
                 __args: {
