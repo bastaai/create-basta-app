@@ -3,6 +3,13 @@ import { AuctionFooter } from "@/components/auction-footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { Calendar, MapPin, Clock } from "lucide-react";
 import Link from "next/link";
 
@@ -17,14 +24,13 @@ type Tag = {
 
 async function getAllAuctions() {
   if (!process.env.ACCOUNT_ID) {
-    console.log("Missing env variable: ACCOUNT_ID");
+    console.error("Missing env variable: ACCOUNT_ID");
     console.log("returning mock auctions...");
     return mockAuctions;
   }
   const client = getClientApiClient();
 
   try {
-    console.log("fetching data...");
     const sales = await client.query({
       sales: {
         __args: {
@@ -95,8 +101,6 @@ async function getAllTags(): Promise<Tag[]> {
   }
 
   try {
-    console.log("fetching tags from search endpoint...");
-
     // Use the SDK's search query to get facets (which contain tags)
     const client = getClientApiClient();
 
@@ -152,10 +156,17 @@ export default async function HomePage() {
   const allAuctions = (await getAllAuctions()) ?? [];
   const allTags = await getAllTags();
 
-  // Separate auctions into upcoming and past based on closing date and status
+  // Separate auctions into ongoing, upcoming, and past based on status and closing date
   const now = DateTime.now();
+
+  // Ongoing auctions: OPENED, LIVE, or CLOSING status
+  const ongoingAuctions = allAuctions.filter((auction) => {
+    return auction.status === "OPENED" || auction.status === "LIVE" || auction.status === "CLOSING";
+  });
+
+  // Upcoming auctions: PUBLISHED status or future closing date
   const upcomingAuctions = allAuctions.filter((auction) => {
-    if (auction.status === "CLOSED") return false;
+    if (auction.status === "CLOSED" || auction.status === "OPENED" || auction.status === "LIVE" || auction.status === "CLOSING") return false;
     if (!auction.dates.closingDate) return true;
     const closingDate = DateTime.fromISO(auction.dates.closingDate);
     return closingDate > now;
@@ -225,7 +236,7 @@ export default async function HomePage() {
             </div>
             <div className="flex flex-wrap justify-center gap-3">
               {allTags.map((tag) => (
-                <Link key={tag.id} href="/departments">
+                <Link key={tag.id} href={`/tags/${encodeURIComponent(tag.name)}`}>
                   <Badge
                     variant="outline"
                     className="cursor-pointer px-4 py-2 text-sm font-normal transition-all hover:bg-accent hover:scale-105 hover:shadow-sm"
@@ -236,6 +247,113 @@ export default async function HomePage() {
               ))}
             </div>
           </div>
+        </section>
+      )}
+
+      {/* Ongoing Auctions */}
+      {ongoingAuctions.length > 0 && (
+        <section className="container mx-auto px-4 py-20 md:py-28">
+          <div className="mb-14 flex items-end justify-between">
+            <div>
+              <h2 className="font-serif text-3xl font-light tracking-tight md:text-4xl">
+                Ongoing Auctions
+              </h2>
+              <p className="mt-3 text-base text-muted-foreground">
+                Auctions currently accepting bids
+              </p>
+            </div>
+            <Link href="/auctions">
+              <Button variant="ghost" className="hidden font-normal md:flex">
+                View All Auctions
+                <Calendar className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+
+          <Carousel
+            opts={{
+              align: "start",
+              loop: false,
+            }}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-2 md:-ml-4">
+              {ongoingAuctions.map((auction) => {
+                const dt = auction.dates.openDate
+                  ? DateTime.fromISO(auction.dates.openDate)
+                  : undefined;
+                return (
+                  <CarouselItem key={auction.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
+                    <Link href={`/auction/${auction.id}`}>
+                      <Card className="group flex flex-col overflow-hidden border-border/50 transition-all hover:border-border hover:shadow-md">
+                        <div className="relative aspect-[4/3] overflow-hidden">
+                          <img
+                            src={auction.image || "/placeholder.svg"}
+                            alt={auction.title}
+                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                          <Badge
+                            className={`absolute right-4 top-4 border-0 backdrop-blur-sm ${auction.status === "LIVE"
+                              ? "bg-green-500/90 text-white"
+                              : auction.status === "CLOSING"
+                                ? "bg-orange-500/90 text-white"
+                                : "bg-blue-500/90 text-white"
+                              }`}
+                          >
+                            {auction.status === "LIVE" && (
+                              <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                            )}
+                            {auction.status === "LIVE"
+                              ? "Live Now"
+                              : auction.status === "CLOSING"
+                                ? "Closing Soon"
+                                : "Open For Bidding"}
+                          </Badge>
+                        </div>
+                        <CardContent className="flex flex-1 flex-col p-6">
+                          <h3 className="font-serif text-xl font-normal leading-snug text-balance tracking-tight">
+                            {auction.title}
+                          </h3>
+
+                          <div className="mt-5 space-y-2.5 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2.5">
+                              <MapPin className="h-3.5 w-3.5" />
+                              <span>{auction.location}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <Calendar className="h-3.5 w-3.5" />
+                              <span>{dt ? dt.toFormat("dd LLL yyyy") : "TBA"}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{dt ? dt.toFormat("HH:mm") : "TBA"}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-5 flex flex-1 items-end justify-between border-t border-border/50 pt-5">
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Lots
+                              </p>
+                              <p className="mt-1 font-medium">{auction.lotsCount}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Estimate
+                              </p>
+                              <p className="mt-1 font-medium">{auction.estimate}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </CarouselItem>
+                );
+              })}
+            </CarouselContent>
+            <CarouselPrevious className="hidden md:flex -left-4" />
+            <CarouselNext className="hidden md:flex -right-4" />
+          </Carousel>
         </section>
       )}
 

@@ -49,6 +49,8 @@ export function translateItemStatus(status: string | undefined | null): string {
     ITEM_SOLD: "Sold",
     ITEM_WITHDRAWN: "Withdrawn",
     ITEM_PASSED: "Passed",
+    ITEM_PROCESSING: "Closed",
+    ITEM_CLOSING: "Closing Soon",
   };
 
   return (

@@ -8,11 +8,14 @@ const MANAGEMENT_API_URL = "https://management.api.basta.wtf/graphql";
  * @param bidderToken - Optional bidder token for authenticated operations (bidding)
  */
 export function getClientApiClient(bidderToken?: string) {
+
+    const headers = {
+        ...(bidderToken ? { "Authorization": `Bearer ${bidderToken}` } : {}),
+    };
+
     return createClientApiClient({
         url: CLIENT_API_URL,
-        headers: {
-            ...(bidderToken ? { "Authorization": `Bearer ${bidderToken}` } : {}),
-        },
+        headers: headers,
     });
 }
 

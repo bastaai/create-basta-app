@@ -8,8 +8,6 @@ export async function POST(request: NextRequest) {
         // Get authenticated session
         const session = await getServerSession(authOptions);
 
-        console.log("Session in API route:", session);
-
         if (!session?.user) {
             return NextResponse.json(
                 { error: "Unauthorized - Please log in" },

@@ -25,6 +25,7 @@ import { clientApiSchema } from "@bastaai/basta-js";
 import { translateItemStatus, formatCurrency, toMajorCurrency } from "@/lib/utils";
 import { getClientApiClient } from "@/lib/basta-client";
 import { RegistrationModal, type SaleRegistration } from "@/components/registration-modal";
+import { CountdownDisplay } from "./lot/[lotId]/countdown";
 
 // Import the reusable filter system
 import {
@@ -64,6 +65,7 @@ export type Lot = {
   startingBid: number | null;
   bidsCount: number | undefined;
   reserveMet: boolean | null;
+  status: clientApiSchema.ItemStatus;
 };
 
 export type Auction = {
@@ -125,6 +127,8 @@ export default function AuctionDetailPage({
     }
     setRegistrationModalOpen(true);
   };
+
+  console.log("localtion", auctionDetails.location);
 
   // Calculate estimate range from lots
   const estimateRange = useMemo(() => {
@@ -215,9 +219,6 @@ export default function AuctionDetailPage({
         );
         const sortByValue = getSortString(filters.sortBy, SORT_OPTIONS);
 
-        console.log("Making API call with filterBy:", filterBy);
-        console.log("Selected facets:", filters.selectedFacets);
-
         const searchData = await client.query({
           search: {
             __args: {
@@ -237,12 +238,14 @@ export default function AuctionDetailPage({
                   cursor: true,
                   saleId: true,
                   itemNumber: true,
+                  status: true,
                   title: true,
                   estimates: {
                     low: true,
                     high: true,
                   },
                   currentBid: true,
+                  bidStatus: true,
                   startingBid: true,
                   totalBids: true,
                   reserveMet: true,
@@ -266,21 +269,27 @@ export default function AuctionDetailPage({
 
         const searchResult = searchData.search;
         const fetchedLots: Lot[] =
-          searchResult?.edges?.map((edge: any) => {
-            const lot = edge.node.on_Item || edge.node;
-            return {
-              id: lot.id,
-              lotNumber: lot.itemNumber,
-              title: lot.title ?? undefined,
-              lowEstimate: lot.estimates?.low,
-              highEstimate: lot.estimates?.high,
-              image: lot.images?.[0]?.url,
-              currentBid: lot.currentBid,
-              startingBid: lot.startingBid,
-              bidsCount: lot.totalBids,
-              reserveMet: lot.reserveMet ?? null,
-            };
-          }) || [];
+          (searchResult?.edges
+            ?.map((edge) => {
+              if (edge.node.__typename === "Item") {
+                const lot = edge.node;
+                return {
+                  id: lot.id,
+                  lotNumber: lot.itemNumber,
+                  title: lot.title ?? undefined,
+                  lowEstimate: lot.estimates?.low,
+                  highEstimate: lot.estimates?.high,
+                  image: lot.images?.[0]?.url,
+                  currentBid: lot.currentBid,
+                  startingBid: lot.startingBid,
+                  bidsCount: lot.totalBids,
+                  reserveMet: lot.reserveMet ?? null,
+                  status: lot.status,
+                } as Lot;
+              }
+              return null;
+            })
+            .filter((lot): lot is Lot => lot !== null) || []) as Lot[];
 
         setLots(fetchedLots);
         setFilteredTotal(searchResult?.pageInfo?.totalRecords || 0);
@@ -335,18 +344,11 @@ export default function AuctionDetailPage({
         label: "Closed",
         className: "bg-muted text-muted-foreground border-border",
       },
+      PROCESSING: {
+        label: "Closed",
+        className: "bg-muted text-muted-foreground border-border",
+      },
     };
-
-    const itemStatusLabel = translateItemStatus(status);
-    if (
-      itemStatusLabel !==
-      status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
-    ) {
-      return {
-        label: itemStatusLabel,
-        className: "bg-muted text-foreground",
-      };
-    }
 
     return (
       statusMap[status] || {
@@ -358,11 +360,33 @@ export default function AuctionDetailPage({
 
   const statusDisplay = getStatusDisplay(auctionDetails?.status);
 
+  // Map SaleStatus to ItemStatus for countdown component
+  const mapSaleStatusToItemStatus = (saleStatus: string | undefined): clientApiSchema.ItemStatus => {
+    switch (saleStatus) {
+      case "PUBLISHED":
+        return "ITEM_NOT_OPEN";
+      case "OPENED":
+      case "LIVE":
+        return "ITEM_OPEN";
+      case "CLOSING":
+        return "ITEM_CLOSING";
+      case "CLOSED":
+        return "ITEM_CLOSED";
+      default:
+        return "ITEM_NOT_OPEN";
+    }
+  };
+
   // Custom label renderer for item status values
   const labelRenderers = {
     status: translateItemStatus,
     itemStatus: translateItemStatus,
   };
+
+  // Filter out estimate facets since we're using a range slider instead
+  const filteredFacets = facets.filter(
+    (facet) => facet.fieldName !== "lowEstimate" && facet.fieldName !== "highEstimate"
+  );
 
   // Filter sidebar content (reused in desktop and mobile)
   const FilterSidebarContent = () => (
@@ -382,9 +406,9 @@ export default function AuctionDetailPage({
         onClear={() => filters.clearRange("lowEstimate")}
       />
 
-      {/* Facet Filters (includes location if available) */}
+      {/* Facet Filters (excludes estimate facets - using range slider instead) */}
       <FilterPanel
-        facets={facets}
+        facets={filteredFacets}
         selectedFacets={filters.selectedFacets}
         onToggleFacet={filters.toggleFacet}
         onClearFacet={filters.clearFacet}
@@ -413,7 +437,7 @@ export default function AuctionDetailPage({
               <h1 className="font-serif text-4xl font-bold md:text-5xl">
                 {auctionDetails?.title}
               </h1>
-              <div className="mt-6 flex flex-wrap gap-6 text-muted-foreground">
+              <div className="mt-6 flex flex-wrap items-center gap-6 text-muted-foreground">
                 {auctionDetails?.location && (
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
@@ -428,6 +452,16 @@ export default function AuctionDetailPage({
                   <Clock className="h-4 w-4" />
                   <span>{dt ? dt.toFormat("HH:mm") : "TBA"}</span>
                 </div>
+                {/* Countdown - only show when auction is in CLOSING status */}
+                {auctionDetails.dates.closingDate && auctionDetails.status === "CLOSING" && (
+                  <div className="flex items-center gap-2">
+                    <CountdownDisplay
+                      closingDate={auctionDetails.dates.closingDate}
+                      status={mapSaleStatusToItemStatus(auctionDetails.status)}
+                      variant="compact"
+                    />
+                  </div>
+                )}
               </div>
             </div>
             {auctionDetails?.status !== "CLOSED" &&
@@ -475,7 +509,7 @@ export default function AuctionDetailPage({
               {/* Mobile Filter Button */}
               <div className="lg:hidden">
                 <FilterSheet
-                  facets={facets}
+                  facets={filteredFacets}
                   selectedFacets={filters.selectedFacets}
                   onToggleFacet={filters.toggleFacet}
                   onClearFacet={filters.clearFacet}
@@ -490,7 +524,7 @@ export default function AuctionDetailPage({
               <div className="mb-6">
                 <ActiveFilters
                   selectedFacets={filters.selectedFacets}
-                  facets={facets}
+                  facets={filteredFacets}
                   onRemove={filters.toggleFacet}
                   onClearAll={() => {
                     filters.clearAllFacets();
@@ -534,9 +568,16 @@ export default function AuctionDetailPage({
                       </Badge>
                     </div>
                     <CardContent className="p-4">
-                      <h3 className="mt-1 font-serif text-base font-semibold leading-tight text-balance">
-                        {lot.title}
-                      </h3>
+                      <div className="mb-2 flex items-center justify-between">
+                        <h3 className="font-serif text-base font-semibold leading-tight text-balance">
+                          {lot.title}
+                        </h3>
+                        {lot.status && (
+                          <Badge variant="outline" className="ml-2 shrink-0 text-xs">
+                            {translateItemStatus(lot.status)}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="mt-4 border-t border-border pt-3">
                         {lot.lowEstimate !== null && lot.lowEstimate !== undefined &&
                           lot.highEstimate !== null && lot.highEstimate !== undefined &&

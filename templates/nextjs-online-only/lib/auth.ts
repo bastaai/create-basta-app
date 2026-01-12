@@ -3,7 +3,12 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { mockUsers } from "@/app/_mocks/users";
 import { getManagementApiClient, getAccountId } from "@/lib/basta-client";
 
-async function createBidderToken(userId: string): Promise<string | null> {
+type BidderTokenData = {
+    token: string;
+    expiration: string;
+};
+
+async function createBidderToken(userId: string): Promise<BidderTokenData | null> {
     if (!userId) {
         console.error("createBidderToken: userId is required");
         return null;
@@ -12,8 +17,6 @@ async function createBidderToken(userId: string): Promise<string | null> {
     try {
         const client = getManagementApiClient();
         const accountId = getAccountId();
-
-        console.log("Creating bidder token for user:", userId);
 
         const tokenRes = await client.mutation({
             createBidderToken: {
@@ -32,13 +35,30 @@ async function createBidderToken(userId: string): Promise<string | null> {
             },
         });
 
-        const token = tokenRes.createBidderToken?.token || null;
-        console.log("Bidder token created:", token ? "success" : "failed");
-        return token;
+        const bidderToken = tokenRes.createBidderToken;
+        if (!bidderToken?.token || !bidderToken?.expiration) {
+            console.error("Failed to create bidder token: missing token or expiration");
+            return null;
+        }
+
+        console.log("Bidder token created, expires at:", bidderToken.expiration);
+        return {
+            token: bidderToken.token,
+            expiration: bidderToken.expiration,
+        };
     } catch (error) {
         console.error("Failed to create bidder token:", error);
         return null;
     }
+}
+
+function isTokenExpired(expiration: string | undefined): boolean {
+    if (!expiration) return true;
+    const expirationTime = new Date(expiration).getTime();
+    const now = Date.now();
+    // Consider token expired if it expires in less than 5 minutes
+    const bufferMs = 5 * 60 * 1000;
+    return expirationTime - now < bufferMs;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -70,18 +90,28 @@ export const authOptions: NextAuthOptions = {
                 token.name = user.name;
                 token.email = user.email;
                 // Fetch bidder token on login
-                const bidderToken = await createBidderToken(user.id);
-                if (bidderToken) {
-                    token.bidderToken = bidderToken;
+                const bidderTokenData = await createBidderToken(user.id);
+                if (bidderTokenData) {
+                    token.bidderToken = bidderTokenData.token;
+                    token.bidderTokenExpiration = bidderTokenData.expiration;
                 }
             }
-            // Refresh bidder token if it's not present or on update
-            if ((trigger === "update" || !token.bidderToken) && token.id) {
-                const bidderToken = await createBidderToken(token.id as string);
-                if (bidderToken) {
-                    token.bidderToken = bidderToken;
+
+            // Check if bidder token is expired or missing and refresh it
+            const needsRefresh =
+                trigger === "update" ||
+                !token.bidderToken ||
+                isTokenExpired(token.bidderTokenExpiration as string | undefined);
+
+            if (needsRefresh && token.id) {
+                console.log("Refreshing bidder token...");
+                const bidderTokenData = await createBidderToken(token.id as string);
+                if (bidderTokenData) {
+                    token.bidderToken = bidderTokenData.token;
+                    token.bidderTokenExpiration = bidderTokenData.expiration;
                 }
             }
+
             return token;
         },
         async session({ session, token }) {
@@ -91,7 +121,7 @@ export const authOptions: NextAuthOptions = {
                 session.user.email = token.email;
             }
             if (token.bidderToken) {
-                session.bidderToken = token.bidderToken;
+                session.bidderToken = token.bidderToken as string;
             }
             return session;
         },

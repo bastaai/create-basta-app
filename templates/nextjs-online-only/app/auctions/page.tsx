@@ -194,14 +194,14 @@ export default async function AuctionCalendarPage() {
     const now = DateTime.now();
 
     // Separate auctions into categories
-    const liveAuctions = allAuctions.filter(
-        (auction) => auction.status === "LIVE" || auction.status === "CLOSING"
+    const openForBiddingAuctions = allAuctions.filter(
+        (auction) => auction.status === "OPENED" || auction.status === "LIVE" || auction.status === "CLOSING"
     );
 
     const upcomingAuctions = allAuctions
         .filter((auction) => {
-            if (auction.status === "CLOSED") return false;
-            if (auction.status === "LIVE" || auction.status === "CLOSING") return false;
+            if (auction.status === "CLOSED" || auction.status === "PROCESSING") return false;
+            if (auction.status === "LIVE" || auction.status === "CLOSING" || auction.status === "OPENED") return false;
             if (!auction.dates.closingDate) return true;
             const closingDate = DateTime.fromISO(auction.dates.closingDate);
             return closingDate > now;
@@ -285,7 +285,7 @@ export default async function AuctionCalendarPage() {
                     <TabsList className="mb-8 grid w-full max-w-md mx-auto grid-cols-3">
                         <TabsTrigger value="live" className="gap-2">
                             <Radio className="h-3.5 w-3.5" />
-                            Live ({liveAuctions.length})
+                            Open ({openForBiddingAuctions.length})
                         </TabsTrigger>
                         <TabsTrigger value="upcoming" className="gap-2">
                             <CalendarDays className="h-3.5 w-3.5" />
@@ -299,11 +299,11 @@ export default async function AuctionCalendarPage() {
 
                     {/* Live Auctions */}
                     <TabsContent value="live">
-                        {liveAuctions.length === 0 ? (
+                        {openForBiddingAuctions.length === 0 ? (
                             <div className="py-20 text-center">
                                 <Radio className="mx-auto h-12 w-12 text-muted-foreground/50" />
                                 <h3 className="mt-4 font-serif text-2xl font-light">
-                                    No Live Auctions
+                                    No Open Auctions
                                 </h3>
                                 <p className="mt-2 text-muted-foreground">
                                     Check back soon or browse our upcoming sales
@@ -316,7 +316,7 @@ export default async function AuctionCalendarPage() {
                             </div>
                         ) : (
                             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                {liveAuctions.map((auction) => (
+                                {openForBiddingAuctions.map((auction) => (
                                     <AuctionCard key={auction.id} auction={auction} />
                                 ))}
                             </div>
