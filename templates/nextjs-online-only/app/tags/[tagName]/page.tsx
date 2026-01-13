@@ -43,7 +43,7 @@ async function getItemsByTag(tagName: string, bidderToken?: string): Promise<Tag
         // Search for items with the specified tag
         // Tags is an array field, so use array syntax: tags:=[tagName]
         const escapedTagName = escapeTypesenseValue(tagName);
-        const filterBy = `tags:=[${escapedTagName}]`;
+        const filterBy = `tags:=[${escapedTagName}] AND statuses:=["ITEM_CLOSED", "ITEM_", "ITEM_SOLD", "ITEM_WITHDRAWN"]`;
 
         const searchData = await client.query({
             search: {
