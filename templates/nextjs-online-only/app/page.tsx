@@ -189,6 +189,16 @@ export default async function HomePage() {
     })
     .slice(0, 3); // Limit to 3 most recent past auctions
 
+  const upcomingAndOngoingAuctions = [...ongoingAuctions, ...upcomingAuctions].sort((a, b) => {
+    const dateA = a.dates.openDate
+      ? DateTime.fromISO(a.dates.openDate)
+      : DateTime.fromMillis(0);
+    const dateB = b.dates.openDate
+      ? DateTime.fromISO(b.dates.openDate)
+      : DateTime.fromMillis(0);
+    return dateA.toMillis() - dateB.toMillis();
+  });
+
   return (
     <div className="min-h-screen">
       <AuctionNav />
@@ -224,14 +234,14 @@ export default async function HomePage() {
       </section>
 
       {/* Tags Section */}
-      {allTags.length > 0 && (
-        <section className="border-b border-border/50 bg-muted/10 py-12 md:py-16">
-          <div className="container mx-auto px-4">
-            <div className="mb-8 text-center">
-              <h2 className="font-serif text-2xl font-light tracking-tight md:text-3xl">
-                Browse by Tags
-              </h2>
-            </div>
+      <section className="border-b border-border/50 bg-muted/10 py-12 md:py-16">
+        <div className="container mx-auto px-4">
+          <div className="mb-8 text-center">
+            <h2 className="font-serif text-2xl font-light tracking-tight md:text-3xl">
+              Browse by Tags
+            </h2>
+          </div>
+          {allTags.length > 0 ? (
             <div className="flex flex-wrap justify-center gap-3">
               {allTags.map((tag) => (
                 <Link key={tag.id} href={`/tags/${encodeURIComponent(tag.name)}`}>
@@ -244,20 +254,26 @@ export default async function HomePage() {
                 </Link>
               ))}
             </div>
-          </div>
-        </section>
-      )}
+          ) : (
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">
+                No tags are available at this time.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
 
       <main>
-        {/* Ongoing Auctions */}
+        {/* Upcoming Auctions (includes ongoing) */}
         <section className="container mx-auto px-4 py-20 md:py-28">
           <div className="mb-14 flex items-end justify-between">
             <div>
               <h2 className="font-serif text-3xl font-light tracking-tight md:text-4xl">
-                Ongoing Auctions
+                Upcoming Auctions
               </h2>
               <p className="mt-3 text-base text-muted-foreground">
-                Auctions currently accepting bids
+                Ongoing and upcoming sales in one place
               </p>
             </div>
             <Link href="/auctions">
@@ -267,123 +283,7 @@ export default async function HomePage() {
               </Button>
             </Link>
           </div>
-          {ongoingAuctions.length === 0 ? (
-            <Card className="border-border/50 bg-muted/10">
-              <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-                <p className="font-serif text-xl font-light">No ongoing auctions</p>
-                <p className="text-sm text-muted-foreground">
-                  Check back soon for live and open bidding.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Carousel
-              opts={{
-                align: "start",
-                loop: false,
-              }}
-              className="w-full"
-            >
-              <CarouselContent className="-ml-2 md:-ml-4">
-                {ongoingAuctions.map((auction) => {
-                  const dt = auction.dates.openDate
-                    ? DateTime.fromISO(auction.dates.openDate)
-                    : undefined;
-                  return (
-                    <CarouselItem key={auction.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
-                      <Link href={`/auction/${auction.id}`}>
-                        <Card className="group flex flex-col overflow-hidden border-border/50 transition-all hover:border-border hover:shadow-md">
-                          <div className="relative aspect-[4/3] overflow-hidden">
-                            <img
-                              src={auction.image || "/placeholder.svg"}
-                              alt={auction.title}
-                              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                            />
-                            <Badge
-                              className={`absolute right-4 top-4 border-0 backdrop-blur-sm ${auction.status === "LIVE"
-                                ? "bg-green-500/90 text-white"
-                                : auction.status === "CLOSING"
-                                  ? "bg-orange-500/90 text-white"
-                                  : "bg-blue-500/90 text-white"
-                                }`}
-                            >
-                              {auction.status === "LIVE" && (
-                                <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                              )}
-                              {auction.status === "LIVE"
-                                ? "Live Now"
-                                : auction.status === "CLOSING"
-                                  ? "Closing Soon"
-                                  : "Open For Bidding"}
-                            </Badge>
-                          </div>
-                          <CardContent className="flex flex-1 flex-col p-6">
-                            <h3 className="font-serif text-xl font-normal leading-snug text-balance tracking-tight">
-                              {auction.title}
-                            </h3>
-
-                            <div className="mt-5 space-y-2.5 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-2.5">
-                                <MapPin className="h-3.5 w-3.5" />
-                                <span>{auction.location}</span>
-                              </div>
-                              <div className="flex items-center gap-2.5">
-                                <Calendar className="h-3.5 w-3.5" />
-                                <span>{dt ? dt.toFormat("dd LLL yyyy") : "TBA"}</span>
-                              </div>
-                              <div className="flex items-center gap-2.5">
-                                <Clock className="h-3.5 w-3.5" />
-                                <span>{dt ? dt.toFormat("HH:mm") : "TBA"}</span>
-                              </div>
-                            </div>
-
-                            <div className="mt-5 flex flex-1 items-end justify-between border-t border-border/50 pt-5">
-                              <div>
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                  Lots
-                                </p>
-                                <p className="mt-1 font-medium">{auction.lotsCount}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                  Estimate
-                                </p>
-                                <p className="mt-1 font-medium">{auction.estimate}</p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </Link>
-                    </CarouselItem>
-                  );
-                })}
-              </CarouselContent>
-              <CarouselPrevious className="hidden md:flex -left-4" />
-              <CarouselNext className="hidden md:flex -right-4" />
-            </Carousel>
-          )}
-        </section>
-
-        {/* Upcoming Auctions */}
-        <section className="container mx-auto px-4 py-20 md:py-28">
-          <div className="mb-14 flex items-end justify-between">
-            <div>
-              <h2 className="font-serif text-3xl font-light tracking-tight md:text-4xl">
-                Upcoming Auctions
-              </h2>
-              <p className="mt-3 text-base text-muted-foreground">
-                Browse our calendar of exceptional sales
-              </p>
-            </div>
-            <Link href="/auctions">
-              <Button variant="ghost" className="hidden font-normal md:flex">
-                View Calendar
-                <Calendar className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-
-          {upcomingAuctions.length === 0 ? (
+          {upcomingAndOngoingAuctions.length === 0 ? (
             <Card className="border-border/50 bg-muted/10">
               <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
                 <p className="font-serif text-xl font-light">No upcoming auctions</p>
@@ -393,64 +293,70 @@ export default async function HomePage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {upcomingAuctions.map((auction) => {
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {upcomingAndOngoingAuctions.map((auction) => {
                 const dt = auction.dates.openDate
                   ? DateTime.fromISO(auction.dates.openDate)
                   : undefined;
                 return (
                   <Link key={auction.id} href={`/auction/${auction.id}`}>
                     <Card className="group flex flex-col overflow-hidden border-border/50 transition-all hover:border-border hover:shadow-md">
-                      <div className="relative aspect-[4/3] overflow-hidden">
+                      <div className="relative aspect-[16/10] overflow-hidden">
                         <img
                           src={auction.image || "/placeholder.svg"}
                           alt={auction.title}
                           className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />
                         <Badge
-                          className={`absolute right-4 top-4 border-0 backdrop-blur-sm ${auction.status === "LIVE"
+                          className={`absolute right-3 top-3 border-0 backdrop-blur-sm text-xs ${auction.status === "LIVE"
                             ? "bg-green-500/90 text-white"
-                            : "bg-background/90 text-foreground"
+                            : auction.status === "CLOSING"
+                              ? "bg-orange-500/90 text-white"
+                              : "bg-blue-500/90 text-white"
                             }`}
                         >
                           {auction.status === "LIVE" && (
                             <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
                           )}
-                          {auction.label}
+                          {auction.status === "LIVE"
+                            ? "Live Now"
+                            : auction.status === "CLOSING"
+                              ? "Closing Soon"
+                              : "Open For Bidding"}
                         </Badge>
                       </div>
-                      <CardContent className="flex flex-1 flex-col p-6">
-                        <h3 className="font-serif text-xl font-normal leading-snug text-balance tracking-tight">
+                      <CardContent className="flex flex-1 flex-col p-3 md:p-4">
+                        <h3 className="font-serif text-base font-normal leading-tight text-balance tracking-tight md:text-lg">
                           {auction.title}
                         </h3>
 
-                        <div className="mt-5 space-y-2.5 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-2.5">
-                            <MapPin className="h-3.5 w-3.5" />
+                        <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-3 w-3" />
                             <span>{auction.location}</span>
                           </div>
-                          <div className="flex items-center gap-2.5">
-                            <Calendar className="h-3.5 w-3.5" />
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-3 w-3" />
                             <span>{dt ? dt.toFormat("dd LLL yyyy") : "TBA"}</span>
                           </div>
-                          <div className="flex items-center gap-2.5">
-                            <Clock className="h-3.5 w-3.5" />
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3 w-3" />
                             <span>{dt ? dt.toFormat("HH:mm") : "TBA"}</span>
                           </div>
                         </div>
 
-                        <div className="mt-5 flex flex-1 items-end justify-between border-t border-border/50 pt-5">
+                        <div className="mt-3 flex flex-1 items-end justify-between border-t border-border/50 pt-3">
                           <div>
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                               Lots
                             </p>
-                            <p className="mt-1 font-medium">{auction.lotsCount}</p>
+                            <p className="mt-0.5 text-sm font-medium">{auction.lotsCount}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                               Estimate
                             </p>
-                            <p className="mt-1 font-medium">{auction.estimate}</p>
+                            <p className="mt-0.5 text-sm font-medium">{auction.estimate}</p>
                           </div>
                         </div>
                       </CardContent>
@@ -491,7 +397,7 @@ export default async function HomePage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {pastAuctions.map((auction) => {
                 const dt = auction.dates.openDate
                   ? DateTime.fromISO(auction.dates.openDate)
@@ -499,50 +405,50 @@ export default async function HomePage() {
                 return (
                   <Link key={auction.id} href={`/auction/${auction.id}`}>
                     <Card className="group flex flex-col overflow-hidden border-border/50 transition-all hover:border-border hover:shadow-md opacity-90">
-                      <div className="relative aspect-[4/3] overflow-hidden">
+                      <div className="relative aspect-[16/10] overflow-hidden">
                         <img
                           src={auction.image || "/placeholder.svg"}
                           alt={auction.title}
                           className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />
                         <Badge
-                          className="absolute right-4 top-4 border-0 bg-background/90 text-foreground backdrop-blur-sm"
+                          className="absolute right-3 top-3 border-0 bg-background/90 text-foreground backdrop-blur-sm text-xs"
                         >
                           Closed
                         </Badge>
                       </div>
-                      <CardContent className="flex flex-1 flex-col p-6">
-                        <h3 className="font-serif text-xl font-normal leading-snug text-balance tracking-tight">
+                      <CardContent className="flex flex-1 flex-col p-3 md:p-4">
+                        <h3 className="font-serif text-base font-normal leading-tight text-balance tracking-tight md:text-lg">
                           {auction.title}
                         </h3>
 
-                        <div className="mt-5 space-y-2.5 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-2.5">
-                            <MapPin className="h-3.5 w-3.5" />
+                        <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-3 w-3" />
                             <span>{auction.location}</span>
                           </div>
-                          <div className="flex items-center gap-2.5">
-                            <Calendar className="h-3.5 w-3.5" />
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-3 w-3" />
                             <span>{dt ? dt.toFormat("dd LLL yyyy") : "TBA"}</span>
                           </div>
-                          <div className="flex items-center gap-2.5">
-                            <Clock className="h-3.5 w-3.5" />
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3 w-3" />
                             <span>{dt ? dt.toFormat("HH:mm") : "TBA"}</span>
                           </div>
                         </div>
 
-                        <div className="mt-5 flex flex-1 items-end justify-between border-t border-border/50 pt-5">
+                        <div className="mt-3 flex flex-1 items-end justify-between border-t border-border/50 pt-3">
                           <div>
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                               Lots
                             </p>
-                            <p className="mt-1 font-medium">{auction.lotsCount}</p>
+                            <p className="mt-0.5 text-sm font-medium">{auction.lotsCount}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                               Estimate
                             </p>
-                            <p className="mt-1 font-medium">{auction.estimate}</p>
+                            <p className="mt-0.5 text-sm font-medium">{auction.estimate}</p>
                           </div>
                         </div>
                       </CardContent>
@@ -558,14 +464,14 @@ export default async function HomePage() {
             const closingDate = DateTime.fromISO(auction.dates.closingDate);
             return closingDate <= now;
           }).length > 3 && (
-            <div className="mt-10 text-center">
-              <Link href="/auctions">
-                <Button variant="outline" className="font-normal">
-                  View All Past Auctions
-                </Button>
-              </Link>
-            </div>
-          )}
+              <div className="mt-10 text-center">
+                <Link href="/auctions">
+                  <Button variant="outline" className="font-normal">
+                    View All Past Auctions
+                  </Button>
+                </Link>
+              </div>
+            )}
         </section>
       </main>
 
