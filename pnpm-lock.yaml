@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@bastaai/basta-js':
+        specifier: 1.0.0-alpha.6
+        version: 1.0.0-alpha.6(graphql-ws@5.16.2(graphql@16.12.0))(react@19.2.3)(urql@5.0.1(@urql/core@6.0.1(graphql@16.12.0))(react@19.2.3))
       commander:
         specifier: 14.0.2
         version: 14.0.2
@@ -17,9 +20,40 @@ importers:
 
 packages:
 
+  '@0no-co/graphql.web@1.2.0':
+    resolution: {integrity: sha512-/1iHy9TTr63gE1YcR5idjx8UREz1s0kFhydf3bBLCXyqjhkIc6igAzTOx3zPifCwFR87tsh/4Pa9cNts6d2otw==}
+    peerDependencies:
+      graphql: ^14.0.0 || ^15.0.0 || ^16.0.0
+    peerDependenciesMeta:
+      graphql:
+        optional: true
+
+  '@bastaai/basta-js@1.0.0-alpha.6':
+    resolution: {integrity: sha512-M0y63vsq/F0NcpzFYa/G3RJccsoSCTUxU/ZDLzKX7AqkJAKm/mDcAfEDX5/UJtSKjtYce57+a05mwWyFslgBoA==}
+    peerDependencies:
+      graphql-ws: ^6.0.0
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      urql: ^5.0.0
+
+  '@urql/core@6.0.1':
+    resolution: {integrity: sha512-FZDiQk6jxbj5hixf2rEPv0jI+IZz0EqqGW8mJBEug68/zHTtT+f34guZDmyjJZyiWbj0vL165LoMr/TkeDHaug==}
+
   commander@14.0.2:
     resolution: {integrity: sha512-TywoWNNRbhoD0BXs1P3ZEScW8W5iKrnbithIl0YH+uCmBd0QpPOA8yc82DS3BIE5Ma6FnBVUsJ7wVUDz4dvOWQ==}
     engines: {node: '>=20'}
+
+  fast-deep-equal@3.1.3:
+    resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
+
+  graphql-ws@5.16.2:
+    resolution: {integrity: sha512-E1uccsZxt/96jH/OwmLPuXMACILs76pKF2i3W861LpKBCYtGIyPQGtWLuBLkND4ox1KHns70e83PS4te50nvPQ==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      graphql: '>=0.11 <=16'
+
+  graphql@16.12.0:
+    resolution: {integrity: sha512-DKKrynuQRne0PNpEbzuEdHlYOMksHSUI8Zc9Unei5gTsMNA2/vMpoMz/yKba50pejK56qj98qM0SjYxAKi13gQ==}
+    engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
 
   kleur@3.0.3:
     resolution: {integrity: sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w==}
@@ -29,12 +63,55 @@ packages:
     resolution: {integrity: sha512-NxNv/kLguCA7p3jE8oL2aEBsrJWgAakBpgmgK6lpPWV+WuOmY6r2/zbAVnP+T8bQlA0nzHXSJSJW0Hq7ylaD2Q==}
     engines: {node: '>= 6'}
 
+  react@19.2.3:
+    resolution: {integrity: sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA==}
+    engines: {node: '>=0.10.0'}
+
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
+  ts-pattern@5.8.0:
+    resolution: {integrity: sha512-kIjN2qmWiHnhgr5DAkAafF9fwb0T5OhMVSWrm8XEdTFnX6+wfXwYOFjeF86UZ54vduqiR7BfqScFmXSzSaH8oA==}
+
+  urql@5.0.1:
+    resolution: {integrity: sha512-r58gYlWvCTC19QvkTaARaCLV9/bp870byH/qbLaw3S7f8i/bC6x2Szub8RVXptiMxWmqq5dyVBjUL9G+xPEuqg==}
+    peerDependencies:
+      '@urql/core': ^6.0.0
+      react: '>= 16.8.0'
+
+  wonka@6.3.5:
+    resolution: {integrity: sha512-SSil+ecw6B4/Dm7Pf2sAshKQ5hWFvfyGlfPbEd6A14dOH6VDjrmbY86u6nZvy9omGwwIPFR8V41+of1EezgoUw==}
+
 snapshots:
 
+  '@0no-co/graphql.web@1.2.0(graphql@16.12.0)':
+    optionalDependencies:
+      graphql: 16.12.0
+
+  '@bastaai/basta-js@1.0.0-alpha.6(graphql-ws@5.16.2(graphql@16.12.0))(react@19.2.3)(urql@5.0.1(@urql/core@6.0.1(graphql@16.12.0))(react@19.2.3))':
+    dependencies:
+      fast-deep-equal: 3.1.3
+      graphql-ws: 5.16.2(graphql@16.12.0)
+      react: 19.2.3
+      ts-pattern: 5.8.0
+      urql: 5.0.1(@urql/core@6.0.1(graphql@16.12.0))(react@19.2.3)
+
+  '@urql/core@6.0.1(graphql@16.12.0)':
+    dependencies:
+      '@0no-co/graphql.web': 1.2.0(graphql@16.12.0)
+      wonka: 6.3.5
+    transitivePeerDependencies:
+      - graphql
+
   commander@14.0.2: {}
+
+  fast-deep-equal@3.1.3: {}
+
+  graphql-ws@5.16.2(graphql@16.12.0):
+    dependencies:
+      graphql: 16.12.0
+
+  graphql@16.12.0: {}
 
   kleur@3.0.3: {}
 
@@ -43,4 +120,16 @@ snapshots:
       kleur: 3.0.3
       sisteransi: 1.0.5
 
+  react@19.2.3: {}
+
   sisteransi@1.0.5: {}
+
+  ts-pattern@5.8.0: {}
+
+  urql@5.0.1(@urql/core@6.0.1(graphql@16.12.0))(react@19.2.3):
+    dependencies:
+      '@urql/core': 6.0.1(graphql@16.12.0)
+      react: 19.2.3
+      wonka: 6.3.5
+
+  wonka@6.3.5: {}

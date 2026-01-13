@@ -11,4 +11,6 @@ export function finalInstructions(projectDirectory) {
   console.log(`  cd ${projectName}`);
   console.log(`  pnpm install`);
   console.log(`  pnpm dev`);
+  console.log(`\n📋 Don't forget to:`);
+  console.log(`  Visit https://dashboard.basta.app and create some auctions`);
 }
