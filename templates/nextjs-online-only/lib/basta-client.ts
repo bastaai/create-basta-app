@@ -1,7 +1,7 @@
 import { createClientApiClient, createManagementApiClient } from "@bastaai/basta-js";
 
-const CLIENT_API_URL = "https://client.api.basta.wtf/graphql";
-const MANAGEMENT_API_URL = "https://management.api.basta.wtf/graphql";
+const CLIENT_API_URL = "https://client.api.basta.app/graphql";
+const MANAGEMENT_API_URL = "https://management.api.basta.app/graphql";
 
 /**
  * Creates a Basta client API client for read operations and bidding

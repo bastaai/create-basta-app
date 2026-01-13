@@ -25,9 +25,6 @@ function BastaClientProvider({ children }: { children: ReactNode }) {
     return (
         <BastaProvider
             clientApi={{
-                url: "https://client.api.basta.wtf/graphql",
-                wsUrl: "wss://client.api.basta.wtf/graphql",
-
                 headers: {
                     ...(bidderToken
                         ? { Authorization: `Bearer ${bidderToken}` }
