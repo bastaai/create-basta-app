@@ -234,14 +234,14 @@ export default async function HomePage() {
       </section>
 
       {/* Tags Section */}
-      <section className="border-b border-border/50 bg-muted/10 py-12 md:py-16">
-        <div className="container mx-auto px-4">
-          <div className="mb-8 text-center">
-            <h2 className="font-serif text-2xl font-light tracking-tight md:text-3xl">
-              Browse by Tags
-            </h2>
-          </div>
-          {allTags.length > 0 ? (
+      {allTags.length > 0 && (
+        <section className="border-b border-border/50 bg-muted/10 py-12 md:py-16">
+          <div className="container mx-auto px-4">
+            <div className="mb-8 text-center">
+              <h2 className="font-serif text-2xl font-light tracking-tight md:text-3xl">
+                Browse by Tags
+              </h2>
+            </div>
             <div className="flex flex-wrap justify-center gap-3">
               {allTags.map((tag) => (
                 <Link key={tag.id} href={`/tags/${encodeURIComponent(tag.name)}`}>
@@ -254,15 +254,9 @@ export default async function HomePage() {
                 </Link>
               ))}
             </div>
-          ) : (
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">
-                No tags are available at this time.
-              </p>
-            </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       <main>
         {/* Upcoming Auctions (includes ongoing) */}

@@ -3,6 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ReactNode, useState, useEffect } from "react";
 import { BastaProvider } from "@bastaai/basta-js/client";
+import { CLIENT_API_URL, WS_CLIENT_API_URL } from "@/lib/basta-client";
 
 function BastaClientProvider({ children }: { children: ReactNode }) {
     const { data: session, status } = useSession();
@@ -25,6 +26,8 @@ function BastaClientProvider({ children }: { children: ReactNode }) {
     return (
         <BastaProvider
             clientApi={{
+                url: CLIENT_API_URL,
+                wsUrl: WS_CLIENT_API_URL,
                 headers: {
                     ...(bidderToken
                         ? { Authorization: `Bearer ${bidderToken}` }
