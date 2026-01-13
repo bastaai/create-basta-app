@@ -382,8 +382,9 @@ export default function AuctionDetailPage({
   };
 
   // Filter out estimate facets since we're using a range slider instead
+  // Also filter out reserveMet as it shouldn't be shown in filters
   const filteredFacets = facets.filter(
-    (facet) => facet.fieldName !== "lowEstimate" && facet.fieldName !== "highEstimate"
+    (facet) => facet.fieldName !== "lowEstimate" && facet.fieldName !== "highEstimate" && facet.fieldName !== "reserveMet"
   );
 
   // Filter sidebar content (reused in desktop and mobile)
