@@ -55,21 +55,6 @@ function initializeGit(projectDir) {
   }
 }
 
-// Run pnpm install in the project directory
-function installDependencies(projectDir) {
-  console.log("\n📦 Installing dependencies...");
-  try {
-    execSync("pnpm install", {
-      cwd: projectDir,
-      stdio: "inherit",
-    });
-    console.log("\n✅ Dependencies installed successfully");
-    return true;
-  } catch (error) {
-    console.error("\n❌ Failed to install dependencies");
-    return false;
-  }
-}
 
 program.option("-n, --name <name>", "Name for project").parse(process.argv);
 
@@ -118,6 +103,7 @@ if (template === "nextjs-online-only" || template.startsWith("nextjs")) {
   });
 
   if (envResponse.createEnv) {
+    console.log("\n📧 To get your Account ID and API Key, please contact hi@basta.app for a business tenant with Basta.\n");
     const envVars = await prompts([
       {
         type: "text",
@@ -147,9 +133,6 @@ NEXTAUTH_SECRET=${nextAuthSecret}
     }
   }
 }
-
-// Install dependencies
-installDependencies(projectDir);
 
 // Initialize git repository if git is installed
 if (checkGitInstalled()) {
