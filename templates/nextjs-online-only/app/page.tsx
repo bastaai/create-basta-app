@@ -15,18 +15,32 @@ import Link from "next/link";
 
 import { DateTime } from "luxon";
 import { getClientApiClient } from "@/lib/basta-client";
-import { Auction, mockAuctions } from "./_mocks/auctions";
+import { clientApiSchema } from "@bastaai/basta-js";
+
+type Auction = {
+  id: string;
+  title: string | undefined;
+  location: string | undefined;
+  dates: {
+    openDate: string | undefined;
+    closingDate: string | undefined;
+  };
+  status: clientApiSchema.SaleStatus | undefined;
+  image: string | undefined;
+  lotsCount: number | undefined;
+  label: string | undefined;
+  estimate: string | undefined;
+};
 
 type Tag = {
   id: string;
   name: string;
 };
 
-async function getAllAuctions() {
+async function getAllAuctions(): Promise<Auction[]> {
   if (!process.env.ACCOUNT_ID) {
     console.error("Missing env variable: ACCOUNT_ID");
-    console.log("returning mock auctions...");
-    return mockAuctions;
+    return [];
   }
   const client = getClientApiClient();
 
@@ -88,15 +102,14 @@ async function getAllAuctions() {
     });
     return auctions;
   } catch (error) {
-    console.error(error);
-    console.log("Something went wrong, returning mock data...");
-    return mockAuctions;
+    console.error("Error fetching auctions:", error);
+    return [];
   }
 }
 
 async function getAllTags(): Promise<Tag[]> {
   if (!process.env.ACCOUNT_ID) {
-    console.log("Missing env variable: ACCOUNT_ID");
+    console.error("Missing env variable: ACCOUNT_ID");
     return [];
   }
 

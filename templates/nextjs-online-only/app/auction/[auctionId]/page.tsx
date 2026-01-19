@@ -83,6 +83,9 @@ async function getAuctionDetails(id: string, bidderToken?: string): Promise<Auct
               images: {
                 url: true,
               },
+              dates: {
+                closingEnd: true,
+              },
             },
           },
         },
@@ -109,6 +112,7 @@ async function getAuctionDetails(id: string, bidderToken?: string): Promise<Auct
           bidsCount: lot.totalBids,
           reserveMet: lot.reserveMet ?? null,
           status: lot.status,
+          closingDate: lot.dates?.closingEnd ?? null,
         };
       }
       return null;

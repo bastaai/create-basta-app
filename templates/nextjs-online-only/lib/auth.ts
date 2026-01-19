@@ -41,7 +41,6 @@ async function createBidderToken(userId: string): Promise<BidderTokenData | null
             return null;
         }
 
-        console.log("Bidder token created, expires at:", bidderToken.expiration);
         return {
             token: bidderToken.token,
             expiration: bidderToken.expiration,
@@ -104,7 +103,6 @@ export const authOptions: NextAuthOptions = {
                 isTokenExpired(token.bidderTokenExpiration as string | undefined);
 
             if (needsRefresh && token.id) {
-                console.log("Refreshing bidder token...");
                 const bidderTokenData = await createBidderToken(token.id as string);
                 if (bidderTokenData) {
                     token.bidderToken = bidderTokenData.token;

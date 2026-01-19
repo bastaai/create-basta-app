@@ -17,11 +17,12 @@ import {
 } from "@/components/ui/pagination";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 
 import { DateTime } from "luxon";
 import { clientApiSchema } from "@bastaai/basta-js";
+import { useClientApi } from "@bastaai/basta-js/client";
 import { translateItemStatus, formatCurrency, toMajorCurrency } from "@/lib/utils";
 import { getClientApiClient } from "@/lib/basta-client";
 import { RegistrationModal, type SaleRegistration } from "@/components/registration-modal";
@@ -66,6 +67,7 @@ export type Lot = {
   bidsCount: number | undefined;
   reserveMet: boolean | null;
   status: clientApiSchema.ItemStatus;
+  closingDate: string | null;
 };
 
 export type Auction = {
@@ -102,10 +104,88 @@ export default function AuctionDetailPage({
 }) {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
+  const client = useClientApi();
 
   const [lots, setLots] = useState<Lot[]>(auctionDetails.lots.slice(0, 12));
   const [loading, setLoading] = useState(false);
   const [filteredTotal, setFilteredTotal] = useState(auctionDetails.lots.length);
+
+  // Memoize subscription query to prevent re-subscription on re-renders
+  // Note: We only fetch Item fields (not Sale.status) to avoid GraphQL field type conflict
+  // Sale status is derived from lot statuses for more accurate staggered closing handling
+  const subscriptionQuery = useMemo(
+    () =>
+      client.subscription({
+        saleActivity: {
+          __args: {
+            saleId: auctionDetails.id,
+          },
+          on_Item: {
+            __typename: true,
+            id: true,
+            itemNumber: true,
+            title: true,
+            status: true,
+            estimates: {
+              low: true,
+              high: true,
+            },
+            currentBid: true,
+            startingBid: true,
+            totalBids: true,
+            reserveMet: true,
+            images: { url: true },
+            dates: {
+              closingEnd: true,
+            },
+          },
+          on_Sale: {
+            __typename: true,
+            id: true,
+            userSaleRegistrations: {
+              id: true,
+              registrationType: true,
+              saleId: true,
+              userId: true,
+            },
+          },
+        },
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [auctionDetails.id]
+  );
+
+  const [{ data: saleActivityData }] = client.useSubscription({
+    query: subscriptionQuery,
+  });
+
+  // Handle real-time updates from subscription
+  useEffect(() => {
+    if (saleActivityData?.saleActivity?.__typename === "Item") {
+      const updatedItem = saleActivityData.saleActivity;
+      setLots((prevLots) =>
+        prevLots.map((lot) =>
+          lot.id === updatedItem.id
+            ? {
+                ...lot,
+                status: updatedItem.status,
+                currentBid: updatedItem.currentBid,
+                bidsCount: updatedItem.totalBids,
+                reserveMet: updatedItem.reserveMet ?? null,
+                closingDate: updatedItem.dates?.closingEnd ?? null,
+              }
+            : lot
+        )
+      );
+    }
+    if (saleActivityData?.saleActivity?.__typename === "Sale") {
+      const updatedSale = saleActivityData.saleActivity;
+      // Update user registrations
+      if (updatedSale.userSaleRegistrations) {
+        setUserRegistrations(updatedSale.userSaleRegistrations);
+      }
+    }
+  }, [saleActivityData]);
   const itemsPerPage = 12;
 
   // Registration state
@@ -155,8 +235,8 @@ export default function AuctionDetailPage({
   // Use the reusable filter hook
   const filters = useFilters<LotSortValue>({
     defaultSortBy: "lotNumber",
-    onFiltersChange: (state) => {
-      console.log("Filters changed:", state);
+    onFiltersChange: () => {
+      // Filters changed - can be used for analytics
     },
   });
 
@@ -283,6 +363,7 @@ export default function AuctionDetailPage({
                   bidsCount: lot.totalBids,
                   reserveMet: lot.reserveMet ?? null,
                   status: lot.status,
+                  closingDate: lot.dates?.closingEnd ?? null,
                 } as Lot;
               }
               return null;
@@ -317,6 +398,29 @@ export default function AuctionDetailPage({
     ? DateTime.fromISO(auctionDetails.dates.openDate)
     : undefined;
 
+  // Derive effective status from lot statuses (handles staggered closing)
+  // Uses real-time lot statuses to determine the most accurate auction status
+  const derivedStatus = useMemo(() => {
+    // Check lot statuses first - they update in real-time
+    const hasClosingLots = lots.some((lot) => lot.status === "ITEM_CLOSING");
+    const hasOpenLots = lots.some(
+      (lot) => lot.status === "ITEM_OPEN" || lot.status === "ITEM_NOT_OPEN"
+    );
+    const allClosed = lots.every((lot) => lot.status === "ITEM_CLOSED");
+    
+    // If all lots are closed, show as closed
+    if (allClosed && lots.length > 0) return "CLOSED";
+    
+    // If any lots are closing, show as closing
+    if (hasClosingLots) return "CLOSING";
+    
+    // If any lots are open, show as opened
+    if (hasOpenLots) return "OPENED";
+    
+    // Fall back to initial sale status
+    return auctionDetails?.status;
+  }, [auctionDetails?.status, lots]);
+
   // Format status for display
   const getStatusDisplay = (status: string | undefined) => {
     if (!status) return { label: "Unknown", className: "bg-muted text-foreground" };
@@ -335,7 +439,7 @@ export default function AuctionDetailPage({
         className: "bg-amber-500/90 text-white border-0",
       },
       CLOSING: {
-        label: "Closing Soon",
+        label: "Closing",
         className: "bg-orange-500/90 text-white border-0",
       },
       CLOSED: {
@@ -356,7 +460,7 @@ export default function AuctionDetailPage({
     );
   };
 
-  const statusDisplay = getStatusDisplay(auctionDetails?.status);
+  const statusDisplay = getStatusDisplay(derivedStatus);
 
   // Map SaleStatus to ItemStatus for countdown component
   const mapSaleStatusToItemStatus = (saleStatus: string | undefined): clientApiSchema.ItemStatus => {
@@ -428,7 +532,7 @@ export default function AuctionDetailPage({
           <div className="flex items-start justify-between gap-8">
             <div className="flex-1">
               <Badge className={`mb-4 ${statusDisplay.className}`}>
-                {auctionDetails?.status === "LIVE" && (
+                {derivedStatus === "LIVE" && (
                   <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
                 )}
                 {statusDisplay.label}
@@ -451,29 +555,31 @@ export default function AuctionDetailPage({
                   <Clock className="h-4 w-4" />
                   <span>{dt ? dt.toFormat("HH:mm") : "TBA"}</span>
                 </div>
-                {/* Countdown - only show when auction is in CLOSING status */}
-                {auctionDetails.dates.closingDate && auctionDetails.status === "CLOSING" && (
+                {/* Countdown - only show when auction is in CLOSING status and date hasn't passed */}
+                {auctionDetails.dates.closingDate && 
+                  derivedStatus === "CLOSING" && 
+                  new Date(auctionDetails.dates.closingDate) > new Date() && (
                   <div className="flex items-center gap-2">
                     <CountdownDisplay
                       closingDate={auctionDetails.dates.closingDate}
-                      status={mapSaleStatusToItemStatus(auctionDetails.status)}
+                      status={mapSaleStatusToItemStatus(derivedStatus)}
                       variant="compact"
                     />
                   </div>
                 )}
               </div>
             </div>
-            {auctionDetails?.status !== "CLOSED" &&
-              auctionDetails?.status !== "PROCESSING" && (
-                <div className="hidden flex-col gap-2 md:flex">
+            {derivedStatus !== "CLOSED" &&
+              derivedStatus !== "PROCESSING" && (
+                <div className="hidden flex-col items-end gap-2 md:flex">
                   {isRegistered ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-                      <CheckCircle className="h-5 w-5" />
-                      <span className="font-medium">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+                      <span className="text-sm">
                         {registrationStatus === "APPROVED"
-                          ? "Registered to Bid"
+                          ? "Registered"
                           : registrationStatus === "PENDING"
-                            ? "Registration Pending"
+                            ? "Pending approval"
                             : "Registered"}
                       </span>
                     </div>
@@ -571,11 +677,16 @@ export default function AuctionDetailPage({
                         <h3 className="font-serif text-base font-semibold leading-tight text-balance">
                           {lot.title}
                         </h3>
-                        {lot.status && (
-                          <Badge variant="outline" className="ml-2 shrink-0 text-xs">
-                            {translateItemStatus(lot.status)}
-                          </Badge>
-                        )}
+                      </div>
+                      {/* Countdown for active lots */}
+                      <div className="mb-2">
+                        <CountdownDisplay
+                          closingDate={lot.closingDate}
+                          status={lot.status}
+                          variant="compact"
+                          size="sm"
+                          showLabel
+                        />
                       </div>
                       <div className="mt-4 border-t border-border pt-3">
                         {lot.lowEstimate !== null && lot.lowEstimate !== undefined &&

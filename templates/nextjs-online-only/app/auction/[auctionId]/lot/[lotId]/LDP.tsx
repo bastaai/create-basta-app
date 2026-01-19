@@ -32,7 +32,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { formatCurrency } from "@/lib/utils";
@@ -140,107 +140,114 @@ export default function LotDetailPage({
   const [lotData, setLotData] = useState<Lot>(initialLotData);
   const [saleData, setSaleData] = useState<Sale>(initialSaleData);
 
-  const [{ data: saleActivityData }] = client.useSubscription({
-    query: client.subscription({
-      saleActivity: {
-        __args: {
-          saleId: auctionId,
-          itemIdFilter: {
-            itemIds: [lotId],
+  // Memoize the subscription query to prevent re-subscription on re-renders
+  const subscriptionQuery = useMemo(
+    () =>
+      client.subscription({
+        saleActivity: {
+          __args: {
+            saleId: auctionId,
+            itemIdFilter: {
+              itemIds: [lotId],
+            },
           },
-        },
-        on_Item: {
-          __typename: true,
-          id: true,
-          itemNumber: true,
-          title: true,
-          description: true,
-          currency: true,
-          estimates: {
-            low: true,
-            high: true,
-          },
-          currentBid: true,
-          startingBid: true,
-          nextAsks: true,
-          totalBids: true,
-          status: true,
-          nextItem: {
+          on_Item: {
+            __typename: true,
             id: true,
             itemNumber: true,
             title: true,
-            images: {
-              url: true,
+            description: true,
+            currency: true,
+            estimates: {
+              low: true,
+              high: true,
             },
-          },
-          prevItem: {
-            id: true,
-            itemNumber: true,
-            title: true,
-            images: {
-              url: true,
-            },
-          },
-          reserveMet: true,
-          bidStatus: true,
-          reserveStatus: true,
-          images: { url: true },
-          dates: {
-            closingEnd: true,
-            closingStart: true,
-            openDate: true,
-          },
-          userBids: {
-            amount: true,
-            maxAmount: true,
-            date: true,
-            id: true,
-            bidderIdentifier: true,
-            bidStatus: true,
-          },
-          bids: {
-            __args: {
-              collapseSequentialUserBids: false,
-            },
-            amount: true,
-            maxAmount: true,
-            date: true,
-            bidderIdentifier: true,
-            bidOrigin: {
-              on_Aggregator: {
-                name: true,
-              },
-              on_PaddleBidOrigin: {
-                type: true
-              },
-              on_OnlineBidOrigin: {
-                type: true,
-              },
-              on_PhoneBidOrigin: {
-                type: true,
-              }
-            },
-            bidStatus: true,
-            reactiveBid: true,
-            saleId: true,
-            itemId: true,
-            id: true,
-          }
-        },
-        on_Sale: {
-          __typename: true,
-          id: true,
-          title: true,
-          userSaleRegistrations: {
-            id: true,
-            registrationType: true,
-            saleId: true,
+            currentBid: true,
+            startingBid: true,
+            nextAsks: true,
+            totalBids: true,
             status: true,
-            userId: true,
+            nextItem: {
+              id: true,
+              itemNumber: true,
+              title: true,
+              images: {
+                url: true,
+              },
+            },
+            prevItem: {
+              id: true,
+              itemNumber: true,
+              title: true,
+              images: {
+                url: true,
+              },
+            },
+            reserveMet: true,
+            bidStatus: true,
+            reserveStatus: true,
+            images: { url: true },
+            dates: {
+              closingEnd: true,
+              closingStart: true,
+              openDate: true,
+            },
+            userBids: {
+              amount: true,
+              maxAmount: true,
+              date: true,
+              id: true,
+              bidderIdentifier: true,
+              bidStatus: true,
+            },
+            bids: {
+              __args: {
+                collapseSequentialUserBids: false,
+              },
+              amount: true,
+              maxAmount: true,
+              date: true,
+              bidderIdentifier: true,
+              bidOrigin: {
+                on_Aggregator: {
+                  name: true,
+                },
+                on_PaddleBidOrigin: {
+                  type: true,
+                },
+                on_OnlineBidOrigin: {
+                  type: true,
+                },
+                on_PhoneBidOrigin: {
+                  type: true,
+                },
+              },
+              bidStatus: true,
+              reactiveBid: true,
+              saleId: true,
+              itemId: true,
+              id: true,
+            },
+          },
+          on_Sale: {
+            __typename: true,
+            id: true,
+            title: true,
+            userSaleRegistrations: {
+              id: true,
+              registrationType: true,
+              saleId: true,
+              status: true,
+              userId: true,
+            },
           },
         },
-      },
-    }),
+      }),
+    [auctionId, lotId, client]
+  );
+
+  const [{ data: saleActivityData }] = client.useSubscription({
+    query: subscriptionQuery,
   });
 
   useEffect(() => {
@@ -512,13 +519,17 @@ export default function LotDetailPage({
                 {lotData.title}
               </h1>
 
-
-
               {/* Stats Row */}
               <div className="flex items-center gap-6 lg:gap-8 mb-6 text-sm">
                 {/* Countdown */}
                 <div>
-                  <p className="text-muted-foreground">Status</p>
+                  <p className="text-muted-foreground">
+                    {lotData.status === "ITEM_NOT_OPEN"
+                      ? "Opens in"
+                      : lotData.status === "ITEM_OPEN" || lotData.status === "ITEM_CLOSING"
+                        ? "Closes in"
+                        : "Status"}
+                  </p>
                   <CountdownDisplay
                     closingDate={lotData.closingDate}
                     onExpiredChange={handleExpiredChange}
