@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { mockUsers } from "@/app/_mocks/users";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AuctionNav } from "@/components/auction-nav";
 import { AuctionFooter } from "@/components/auction-footer";
 
-export default function LoginPage() {
+function LoginContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { data: session, status } = useSession();
@@ -100,3 +100,17 @@ export default function LoginPage() {
     );
 }
 
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen">
+                <AuctionNav />
+                <div className="container mx-auto px-4 py-20">
+                    <div className="text-center">Loading...</div>
+                </div>
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
+    );
+}
