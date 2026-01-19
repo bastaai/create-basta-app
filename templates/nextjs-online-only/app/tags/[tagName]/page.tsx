@@ -41,9 +41,12 @@ async function getItemsByTag(tagName: string, bidderToken?: string): Promise<Tag
 
     try {
         // Search for items with the specified tag
-        // Tags is an array field, so use array syntax: tags:=[tagName]
+        // Tags is an array field, so use array syntax
+        // Tag names need to be quoted for Typesense string arrays
         const escapedTagName = escapeTypesenseValue(tagName);
-        const filterBy = `tags:=[${escapedTagName}] AND statuses:=["ITEM_CLOSED", "ITEM_", "ITEM_SOLD", "ITEM_WITHDRAWN"]`;
+        // Filter by tag - show all items regardless of status
+        // Format: tags:=["tagName"] for string arrays in Typesense
+        const filterBy = `tags:=[\"${escapedTagName}\"]`;
 
         const searchData = await client.query({
             search: {
