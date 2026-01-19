@@ -252,13 +252,19 @@ export default function LotDetailPage({
 
   useEffect(() => {
     if (saleActivityData?.saleActivity?.__typename === "Item") {
-      setLotData(mapItemToLot(saleActivityData.saleActivity));
-      setSelectedBid(saleActivityData.saleActivity.nextAsks[0]?.toString() || "");
+      // Only update if this is the current lot we're viewing
+      if (saleActivityData.saleActivity.id === lotId) {
+        setLotData(mapItemToLot(saleActivityData.saleActivity));
+        setSelectedBid(saleActivityData.saleActivity.nextAsks[0]?.toString() || "");
+      }
     }
     if (saleActivityData?.saleActivity?.__typename === "Sale") {
-      setSaleData(mapSaleToSale(saleActivityData.saleActivity));
+      // Only update if this is the current sale we're viewing
+      if (saleActivityData.saleActivity.id === auctionId) {
+        setSaleData(mapSaleToSale(saleActivityData.saleActivity));
+      }
     }
-  }, [saleActivityData])
+  }, [saleActivityData, lotId, auctionId])
 
   // Live lot data state - starts with server-rendered data
   const [selectedImage, setSelectedImage] = useState(0);
