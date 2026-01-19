@@ -1,8 +1,22 @@
 import { createClientApiClient, createManagementApiClient } from "@bastaai/basta-js";
 
-export const CLIENT_API_URL = "https://client.api.basta.app/graphql";
-export const WS_CLIENT_API_URL = "wss://client.api.basta.app/graphql";
-export const MANAGEMENT_API_URL = "https://management.api.basta.app/graphql";
+// Allow overriding the domain via environment variables
+// If BASTA_DOMAIN is set, use it to construct URLs; otherwise use the default domain
+const getDomain = () => {
+    const domain = process.env.NEXT_PUBLIC_BASTA_DOMAIN || process.env.BASTA_DOMAIN;
+    if (domain) {
+        // Remove protocol if present
+        const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/^wss?:\/\//, "");
+        return cleanDomain;
+    }
+    return "basta.app";
+};
+
+const domain = getDomain();
+
+export const CLIENT_API_URL = process.env.NEXT_PUBLIC_BASTA_CLIENT_API_URL || `https://client.api.${domain}/graphql`;
+export const WS_CLIENT_API_URL = process.env.NEXT_PUBLIC_BASTA_WS_CLIENT_API_URL || `wss://client.api.${domain}/graphql`;
+export const MANAGEMENT_API_URL = process.env.BASTA_MANAGEMENT_API_URL || `https://management.api.${domain}/graphql`;
 
 /**
  * Creates a Basta client API client for read operations and bidding

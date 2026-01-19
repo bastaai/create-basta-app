@@ -120,13 +120,34 @@ if (template === "nextjs-online-only" || template.startsWith("nextjs")) {
     ]);
 
     if (envVars.accountId && envVars.apiKey) {
+      // Ask if user wants to override the API domain
+      const domainResponse = await prompts({
+        type: "confirm",
+        name: "overrideDomain",
+        message: "Do you want to use a different domain for the Basta API?",
+        initial: false,
+      });
+
+      let domainOverride = "";
+      if (domainResponse.overrideDomain) {
+        const domainInput = await prompts({
+          type: "text",
+          name: "domain",
+          message: "Enter the domain (e.g., customer.com or basta.app):",
+          initial: "basta.app",
+          validate: (value) => (value.trim() === "" ? "Domain is required" : true),
+        });
+        const domain = domainInput.domain?.trim() || "basta.app";
+        domainOverride = `NEXT_PUBLIC_BASTA_DOMAIN=${domain}\n`;
+      }
+
       // Generate a random secret for next-auth
       const nextAuthSecret = crypto.randomBytes(32).toString("base64");
       const envContent = `ACCOUNT_ID=${envVars.accountId}
 API_KEY=${envVars.apiKey}
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=${nextAuthSecret}
-`;
+${domainOverride}`;
       const envPath = path.join(projectDir, ".env.local");
       fs.writeFileSync(envPath, envContent, "utf8");
       console.log(`\n✅ Created .env.local file`);
